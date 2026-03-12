@@ -1,5 +1,5 @@
 // PMS (Project Management System) for Environmental Plant
-// Prisma Schema - 7 Modules
+// Prisma Schema - 14 Modules (including Cost Management)
 
 generator client {
   provider = "prisma-client-js"
@@ -96,6 +96,14 @@ model Project {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // 고도화: 원가 관리 설정
+  costAdminRate           Float   @default(12)
+  activeCostEstimateId   String?
+  activeCostActualId     String?
+  currentGrossProfit     Float?
+  currentOperatingProfit Float?
+  currentProfitRate      Float?
+
   // Relations
   customerId      String?
   customer        Customer?     @relation(fields: [customerId], references: [id])
@@ -109,6 +117,11 @@ model Project {
   finance         Finance[]
   documents       Document[]
   tasks           Task[]
+  
+  // 원가 관리
+  costEstimates  CostEstimate[]
+  costActuals    CostActual[]
+  costExecutions CostExecution[]
 }
 
 model ProjectMember {
@@ -651,4 +664,255 @@ model Notification {
   userId        String
   
   createdAt     DateTime  @default(now())
+}
+
+// ============================================
+// 14. 원가 관리 (Cost Management) - 고도화
+// ============================================
+
+model CostCategory {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  nameEn      String?
+  type        String
+  level       Int      @default(1)
+  parentId    String?
+  parent      CostCategory? @relation("CostCategoryHierarchy", fields: [parentId], references: [id])
+  children    CostCategory[] @relation("CostCategoryHierarchy")
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  defaultRate Float?
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  estimateItems CostEstimateItem[]
+  executionItems CostExecutionItem[]
+  actualItems   CostActualItem[]
+}
+
+model CostEstimate {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  title         String
+  version       Int      @default(1)
+  status        String   @default("DRAFT")
+  contractAmount Float
+  
+  materialCost   Float   @default(0)
+  laborCost      Float   @default(0)
+  outsourceFabrication Float @default(0)
+  outsourceService      Float @default(0)
+  consumableOther       Float @default(0)
+  consumableSafety      Float @default(0)
+  travelExpense         Float @default(0)
+  insuranceWarranty     Float @default(0)
+  dormitoryCost         Float @default(0)
+  miscellaneous         Float @default(0)
+  paymentFeeOther      Float @default(0)
+  rentalForklift        Float @default(0)
+  rentalOther           Float @default(0)
+  vehicleRepair         Float @default(0)
+  vehicleFuel           Float @default(0)
+  vehicleOther          Float @default(0)
+  welfareBusiness       Float @default(0)
+  reserveFund           Float @default(0)
+  indirectCost          Float   @default(0)
+  
+  totalExpense          Float   @default(0)
+  totalDirectCost       Float   @default(0)
+  totalManufacturingCost Float @default(0)
+  
+  sellingAdminRate      Float   @default(12)
+  sellingAdminCost      Float   @default(0)
+  grossProfit           Float   @default(0)
+  operatingProfit       Float   @default(0)
+  profitRate            Float   @default(0)
+  
+  notes          String?
+  estimatedDate  DateTime?
+  validUntil     DateTime?
+  
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  
+  items          CostEstimateItem[]
+  executions     CostExecution[]
+}
+
+model CostEstimateItem {
+  id               String   @id @default(cuid())
+  costEstimateId   String
+  costEstimate     CostEstimate @relation(fields: [costEstimateId], references: [id], onDelete: Cascade)
+  
+  categoryId       String?
+  costCategory     CostCategory? @relation(fields: [categoryId], references: [id])
+  
+  categoryType     String
+  subCategory      String?
+  
+  itemName        String
+  specification   String?
+  unit            String?
+  quantity        Float     @default(1)
+  unitPrice       Float     @default(0)
+  amount          Float
+  
+  sortOrder       Int       @default(0)
+  description     String?
+  vendor          String?
+  remarks         String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model CostExecution {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  costEstimateId  String?
+  costEstimate    CostEstimate? @relation(fields: [costEstimateId], references: [id])
+  
+  type            String
+  periodYear     Int
+  periodMonth    Int?
+  status          String   @default("DRAFT")
+  
+  materialCost    Float    @default(0)
+  laborCost       Float    @default(0)
+  outsourceFabrication Float @default(0)
+  outsourceService     Float @default(0)
+  consumableOther      Float @default(0)
+  consumableSafety    Float @default(0)
+  travelExpense        Float @default(0)
+  insuranceWarranty    Float @default(0)
+  dormitoryCost        Float @default(0)
+  miscellaneous        Float @default(0)
+  paymentFeeOther     Float @default(0)
+  rentalForklift       Float @default(0)
+  rentalOther          Float @default(0)
+  vehicleRepair        Float @default(0)
+  vehicleFuel          Float @default(0)
+  vehicleOther         Float @default(0)
+  welfareBusiness      Float @default(0)
+  reserveFund           Float @default(0)
+  indirectCost    Float    @default(0)
+  
+  totalExpense          Float @default(0)
+  totalDirectCost        Float @default(0)
+  totalManufacturingCost Float @default(0)
+  
+  sellingAdminRate       Float @default(12)
+  sellingAdminCost       Float @default(0)
+  
+  grossProfit     Float    @default(0)
+  operatingProfit Float    @default(0)
+  
+  contractAmount  Float    @default(0)
+  
+  description     String?
+  recordedDate    DateTime @default(now())
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  items          CostExecutionItem[]
+}
+
+model CostExecutionItem {
+  id               String   @id @default(cuid())
+  costExecutionId  String
+  costExecution    CostExecution @relation(fields: [costExecutionId], references: [id], onDelete: Cascade)
+  
+  categoryId       String?
+  costCategory     CostCategory? @relation(fields: [categoryId], references: [id])
+  
+  categoryType     String
+  subCategory      String?
+  
+  itemName        String
+  specification   String?
+  unit            String?
+  quantity        Float     @default(1)
+  unitPrice       Float     @default(0)
+  amount          Float
+  
+  adjustmentType  String?
+  occurDate       DateTime?
+  
+  description     String?
+  vendor          String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model CostActual {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  type            String
+  asOfDate        DateTime
+  contractAmount  Float    @default(0)
+  
+  materialCost    Float    @default(0)
+  laborCost       Float    @default(0)
+  outsourceFabrication Float @default(0)
+  outsourceService     Float @default(0)
+  consumableOther      Float @default(0)
+  consumableSafety    Float @default(0)
+  travelExpense        Float @default(0)
+  insuranceWarranty    Float @default(0)
+  dormitoryCost        Float @default(0)
+  miscellaneous        Float @default(0)
+  paymentFeeOther     Float @default(0)
+  rentalForklift       Float @default(0)
+  rentalOther          Float @default(0)
+  vehicleRepair        Float @default(0)
+  vehicleFuel          Float @default(0)
+  vehicleOther         Float @default(0)
+  welfareBusiness      Float @default(0)
+  reserveFund           Float @default(0)
+  indirectCost    Float    @default(0)
+  
+  totalExpense          Float @default(0)
+  totalDirectCost        Float @default(0)
+  totalManufacturingCost Float @default(0)
+  
+  sellingAdminRate       Float @default(12)
+  sellingAdminCost       Float @default(0)
+  
+  grossProfit     Float    @default(0)
+  operatingProfit Float    @default(0)
+  profitRate      Float    @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  items          CostActualItem[]
+}
+
+model CostActualItem {
+  id             String   @id @default(cuid())
+  costActualId   String
+  costActual     CostActual @relation(fields: [costActualId], references: [id], onDelete: Cascade)
+  
+  categoryId     String?
+  costCategory   CostCategory? @relation(fields: [categoryId], references: [id])
+  
+  categoryType   String
+  subCategory    String?
+  costType       String
+  amount         Float    @default(0)
+  description    String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

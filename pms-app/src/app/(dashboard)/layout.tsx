@@ -17,7 +17,8 @@ import {
   X,
   DollarSign,
   Shield,
-  Bell
+  Bell,
+  Receipt
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ const navigation = [
   { name: '대시보드', href: '/', icon: LayoutDashboard, roles: ['ADMIN', 'PM', 'STAFF'] },
   { name: '프로젝트', href: '/projects', icon: FolderKanban, roles: ['ADMIN', 'PM'] },
   { name: '영업수주', href: '/sales', icon: TrendingUp, roles: ['ADMIN', 'PM'] },
+  { name: '원가관리', href: '/cost', icon: Receipt, roles: ['ADMIN', 'PM'] },
   { name: '예산관리', href: '/budget', icon: Calculator, roles: ['ADMIN', 'PM'] },
   { name: '공사진행', href: '/progress', icon: BarChart3, roles: ['ADMIN', 'PM', 'STAFF'] },
   { name: '손익관리', href: '/finance', icon: DollarSign, roles: ['ADMIN', 'PM'] },

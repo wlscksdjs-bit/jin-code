@@ -339,7 +339,7 @@ export function GanttChart({ tasks, startDate, endDate, showAlerts = true, onTas
     current.setDate(1)
     
     while (current <= maxDate) {
-      const month = current.toLocaleString('default', { month: 'short', year: '2-digit' })
+      const month = `${(current.getMonth() + 1).toString().padStart(2, '0')}월`
       const daysInMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate()
       const startOfMonth = new Date(current)
       const offset = Math.max(0, (startOfMonth.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24))
