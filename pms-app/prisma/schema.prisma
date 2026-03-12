@@ -1,0 +1,654 @@
+// PMS (Project Management System) for Environmental Plant
+// Prisma Schema - 7 Modules
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 1. 사용자 및 인증 (User & Auth)
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String    // Hashed
+  role          String    @default("PM") // ADMIN, PM, STAFF
+  department    String?
+  position      String?
+  phone         String?
+  avatar        String?
+  isActive      Boolean   @default(true)
+  
+  // 2FA
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String? //Encrypted TOTP secret
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  projects      ProjectMember[]
+  timeSheets    TimeSheet[]
+  sales         Sales[]        // 영업담당
+  tasks         Task[]
+  comments      Comment[]
+}
+
+// ============================================
+// 2. 고객사 관리 (Customer)
+// ============================================
+
+model Customer {
+  id            String    @id @default(cuid())
+  name          String
+  code          String    @unique // 고객사 코드
+  industry      String?   // 업종
+  contactPerson String?
+  contactPhone  String?
+  contactEmail  String?
+  address       String?
+  notes         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  projects      Project[]
+  sales         Sales[]
+}
+
+// ============================================
+// 3. 프로젝트 기본 정보 (Project)
+// ============================================
+
+model Project {
+  id              String    @id @default(cuid())
+  code            String    @unique // PJT 코드
+  name            String    // 프로젝트명
+  type            String    // PJT 유형: 환경플랜트, 설비, 공정개선 등
+  status          String    @default("REGISTERED") // REGISTERED, CONTRACT, DESIGN, CONSTRUCTION, COMPLETED, CANCELLED
+  contractType    String?   // 계약 유형: 수주, 용역, 시공
+  
+  // 일정
+  startDate       DateTime?
+  endDate         DateTime?
+  contractDate    DateTime?
+  
+  // 금액
+  contractAmount  Float?    // 계약금액
+  estimatedBudget Float?    // 추정 예산
+  
+  // 현장
+  location        String?
+  address         String?
+  
+  // 정보
+  description     String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+  
+  members         ProjectMember[]
+  sales           Sales[]
+  budgets         Budget[]
+  wbsItems        WbsItem[]
+  progress        Progress[]
+  timeSheets      TimeSheet[]
+  finance         Finance[]
+  documents       Document[]
+  tasks           Task[]
+}
+
+model ProjectMember {
+  id          String    @id @default(cuid())
+  role        String    @default("MEMBER") // PM, LEADER, MEMBER
+  allocation  Float     @default(1.0) // 투입 비율 (0.5 = 1/2, 0.33 = 1/3, etc.)
+  isActive    Boolean   @default(true)
+  joinedAt    DateTime  @default(now())
+  
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+// ============================================
+// 4. 영업수주관리 (Sales - 입찰/계약)
+// ============================================
+
+model Sales {
+  id              String    @id @default(cuid())
+  
+  // 구분
+  type            String    // BIDDING, CONTRACT, CHANGE_ORDER
+  
+  // 상태
+  status          String    @default("DRAFT") // DRAFT, SUBMITTED, EVALUATING, WON, LOST, CANCELLED
+  
+  // 정보
+  title           String    // 입찰/계약 제목
+  bidNumber       String?   // 입찰번호
+  bidAmount       Float?    // 입찰금액
+  winProbability  Int?      // 수주 확률 (%)
+  
+  // 일정
+  bidOpenDate     DateTime? // 개찰일
+  submissionDate  DateTime? // 제출기한
+  contractDate    DateTime? // 계약일
+  
+  // 계약 정보
+  contractAmount  Float?    // 계약금액
+
+  // ============================================
+  // 고도화: 고객사 및 경쟁사 정보
+  // ============================================
+  customerBudget  Float?    // 고객사 예산
+  competitorInfo String?    // 경쟁사 정보 (JSON: [{name, amount, status, notes}])
+
+  // ============================================
+  // 고도화: 실행원가 산출
+  // ============================================
+  laborCost       Float?    // 인건비
+  materialCost    Float?    // 자재비
+  outsourceCost   Float?    // 외주비
+  equipmentCost   Float?    // 장비비
+  otherCost       Float?    // 기타비용
+  executionCost   Float?    // 실행원가 (합계: 자동계산)
+
+  // ============================================
+  // 고도화: 입찰 결과
+  // ============================================
+  bidResult       String?   // WON, LOST, PENDING
+  resultDate      DateTime? // 결과 확정일
+
+  // 상세
+  description     String?
+  notes           String?
+  
+  // 일자
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id])
+  
+  projectId       String?
+  project         Project?  @relation(fields: [projectId], references: [id])
+  
+  managerId       String?
+  manager         User?     @relation(fields: [managerId], references: [id])
+}
+
+// ============================================
+// 5. 예산수립 및 실행 관리 (Budget)
+// ============================================
+
+model Budget {
+  id              String    @id @default(cuid())
+  
+  // 구분
+  type            String    // INITIAL, REVISED, FINAL
+
+  // ============================================
+  // 고도화: 수주 연동
+  // ============================================
+  sourceType       String?   // QUOTE, CONTRACT, REVISION
+  sourceSalesId    String?   // 연동된 Sales ID
+
+  // 예산 정보
+  totalBudget     Float     // 총 예산
+  laborCost       Float?    // 인건비
+  materialCost    Float?    // 자재비
+  outsourceCost   Float?    // 외주비
+  equipmentCost   Float?    // 장비비
+  otherCost       Float?    // 기타비용
+  
+  // 실행 현황
+  actualCost      Float     @default(0) // 실제 비용
+  committedCost   Float     @default(0) // 반영 비용
+
+  // ============================================
+  // 고도화: 손익 관리
+  // ============================================
+  indirectCostRate     Float   @default(0) // 간접비율 (%)
+  sellingAdminCostRate Float   @default(0) // 판관비율 (%)
+  profitMargin         Float?  // 목표이익률 (%)
+  targetProfit         Float?  // 목표이익 (계산값)
+  estimatedProfit      Float?  // 예상이익 (계약금액 - 실행원가)
+  currentProfit        Float?  // 현재손익 (계약금액 - 실제비용)
+  
+  // 상태
+  status          String    @default("DRAFT") // DRAFT, APPROVED, IN_PROGRESS, CLOSED
+  
+  // 적용 시작일
+  effectiveDate   DateTime?
+  
+  // 상세
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  items           BudgetItem[]
+}
+
+// ============================================
+
+model BudgetItem {
+  id              String    @id @default(cuid())
+  
+  // WBS 연동
+  wbsCode         String?   // WBS 코드
+  name            String    // 항목명
+  category        String?   // 카테고리 (인건비, 자재비, 외주비, 장비비, 기타)
+  
+  // 예산 (예정)
+  plannedAmount   Float     // 계획 금액 (예정)
+  
+  // 실행 현황
+  previousAmount  Float     @default(0) // 기실행 (이전 실행분)
+  currentAmount   Float     @default(0) // 금번실행 (이번 실행분)
+  
+  // 실제 총액 (계산용)
+  actualAmount    Float     @default(0) // 실제 금액 (기실행 + 금번실행)
+  
+  // 순번
+  sortOrder       Int       @default(0)
+  
+  // 상세
+  description     String?
+  
+  budgetId        String
+  budget          Budget    @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// WBS (Work Breakdown Structure)
+model WbsItem {
+  id              String    @id @default(cuid())
+  
+  // WBS 정보
+  code            String    // WBS 코드 (예: 1.1, 1.1.1)
+  name            String    // 공정명
+  description     String?
+  
+  // 일정
+  startDate       DateTime?
+  endDate         DateTime?
+  plannedDays     Int?      // 계획 일수
+  
+  // 진도
+  progress        Int       @default(0) // 진도율 (%)
+  
+  // 비용
+  plannedCost     Float?    // 계획 비용
+  actualCost     Float?    // 실제 비용
+  
+  // 순번/계층
+  sortOrder       Int       @default(0)
+  parentId        String?
+  parent          WbsItem?  @relation("WbsHierarchy", fields: [parentId], references: [id])
+  children        WbsItem[] @relation("WbsHierarchy")
+  
+  // 상태
+  status          String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, DELAYED
+  phaseType       String?   // DESIGN, CONSTRUCTION, PROCUREMENT, COMMISSIONING, etc.
+
+  // 마일스톤
+  isMilestone     Boolean   @default(false) // 마일스톤 여부
+  milestoneType   String?   // 마일스톤 유형
+
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  progressRecords Progress[]
+  componentOrders ComponentOrder[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Component Ordering for Detailed Progress Tracking
+model ComponentOrder {
+  id              String    @id @default(cuid())
+  
+  // Component Info
+  componentName   String
+  vendor          String?
+  
+  // Dates
+  orderDate       DateTime?
+  deliveryDate    DateTime?
+  
+  // Status & Cost
+  status          String    @default("ORDERED") // ORDERED, SHIPPED, RECEIVED, INSTALLED, CANCELLED
+  quantity        Int       @default(1)
+  unitCost        Float?
+  totalCost       Float?
+  
+  // Relations
+  wbsItemId       String
+  wbsItem         WbsItem   @relation(fields: [wbsItemId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+
+// ============================================
+// 6. 설계 및 공사 진행 관리 (Progress)
+// ============================================
+
+model Progress {
+  id              String    @id @default(cuid())
+  
+  // 진도 정보
+  date            DateTime  // 기록일
+  plannedProgress Float     @default(0) // 계획 진도 (%)
+  actualProgress Float     @default(0) // 실제 진도 (%)
+  
+  // 상태
+  status          String    @default("NORMAL") // NORMAL, DELAYED, AHEAD
+  
+  // 상세
+  description     String?
+  issues          String?   // 이슈/문제점
+  
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  wbsItemId       String?
+  wbsItem         WbsItem?  @relation(fields: [wbsItemId], references: [id])
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Attachments (现场照片等)
+  attachments     Attachment[]
+}
+
+// ============================================
+// 7. 인원리소스 관리 (Resource & TimeSheet)
+// ============================================
+
+model Resource {
+  id              String    @id @default(cuid())
+  
+  //基本信息
+  name            String
+  employeeNumber  String    @unique // 사번
+  department      String?
+  position        String?
+  grade           String?   // 직급/등급
+  
+  // 기술
+  skills          String?   // 보유 기술 (JSON 배열)
+  certifications  String?   // 자격증 (JSON 배열)
+  
+  // 가용성
+  hourlyRate      Float?    // 시간당 단가
+  monthlyRate     Float?    // 월 단가
+  availability   String    @default("AVAILABLE") // AVAILABLE, ASSIGNED, UNAVAILABLE, ON_LEAVE
+  
+  // 연락처
+  phone           String?
+  email           String?
+  
+  // 상태
+  isActive        Boolean   @default(true)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  timeSheets      TimeSheet[]
+}
+
+model TimeSheet {
+  id              String    @id @default(cuid())
+  
+  //基本信息
+  date            DateTime  // 근무일
+  hours           Float     // 근무 시간
+  
+  // 내용
+  workType        String    // 작업 유형: DESIGN, CONSTRUCTION, MEETING, ADMIN, OTHER
+  description     String?   // 작업 내용
+  
+  // 상태
+  status          String    @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, REJECTED
+  
+  // 비용
+  hourlyRate      Float?    // 시급
+  totalCost       Float?    // 총 비용
+  
+  // 승인
+  approvedBy      String?
+  approvedAt      DateTime?
+  
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  resourceId      String?
+  resource        Resource? @relation(fields: [resourceId], references: [id])
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([userId, projectId, date])
+}
+
+// ============================================
+// 8. 최종 손익관리 (Finance)
+// ============================================
+
+model Finance {
+  id              String    @id @default(cuid())
+  
+  // 구분
+  type            String    // REVENUE, COST
+  
+  // 상세 구분
+  category        String    // SALES, CONSTRUCTION_COST, MATERIAL, LABOR, OUTSOURCE, EQUIPMENT, OTHER
+  
+  // 금액
+  amount          Float     // 금액
+  
+  // 일정
+  occurDate       DateTime  // 발생일
+  billingDate     DateTime? // 청구일
+  paymentDate     DateTime? // 지급일
+  
+  // 상태
+  status          String    @default("PENDING") // PENDING, CONFIRMED, PAID, CANCELLED
+  
+  // 상세
+  description     String?
+  referenceNumber String?   // 참조번호
+  
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ============================================
+// 9. 작업 및 이슈 (Task & Issue)
+// ============================================
+
+model Task {
+  id              String    @id @default(cuid())
+  
+  //基本信息
+  title           String
+  description     String?
+  
+  // 상태/우선순위
+  status          String    @default("TODO") // TODO, IN_PROGRESS, REVIEW, DONE
+  priority        String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  
+  // 일정
+  dueDate         DateTime?
+  completedAt     DateTime?
+  
+  // 담당
+  assigneeId      String?
+  assignee        User?     @relation(fields: [assigneeId], references: [id])
+  
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  wbsItemId       String?
+  
+  // 순번
+  sortOrder       Int       @default(0)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  comments        Comment[]
+}
+
+model Comment {
+  id              String    @id @default(cuid())
+  
+  content         String
+  
+  taskId          String
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ============================================
+// 10. 문서 관리 (Document)
+// ============================================
+
+model Document {
+  id              String    @id @default(cuid())
+  
+  //基本信息
+  title           String
+  type            String    // CONTRACT, DRAWING, REPORT, MANUAL, ETC
+  
+  // 파일
+  fileName        String?
+  fileUrl         String?
+  fileSize        Int?
+  mimeType        String?
+  
+  // 버전
+  version         String    @default("1.0")
+  
+  // 상태
+  isActive        Boolean   @default(true)
+  
+  // 설명
+  description     String?
+  
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ============================================
+// 11. 첨부파일 (Attachment)
+// ============================================
+
+model Attachment {
+  id              String    @id @default(cuid())
+  
+  //基本信息
+  fileName        String
+  fileUrl         String
+  fileSize        Int?
+  mimeType        String?
+  
+  // 설명
+  description     String?
+  
+  // 연결
+  progressId      String?
+  progress        Progress? @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+}
+
+// ============================================
+// 12. 감사 로깅 (Audit Log)
+// ============================================
+
+model AuditLog {
+  id            String    @id @default(cuid())
+  
+  // 작업 정보
+  action        String    // CREATE, UPDATE, DELETE, LOGIN, LOGOUT 등
+  entityType    String    // User, Project, Sales 등
+  entityId      String?
+  
+  // 변경 내용 (JSON)
+  changes       String?   // 변경 전후 데이터 (JSON)
+  
+  // 요청 정보
+  ipAddress     String?
+  userAgent     String?
+  
+  // 사용자
+  userId        String?
+  
+  createdAt     DateTime  @default(now())
+}
+
+// ============================================
+// 13. 알림 (Notification)
+// ============================================
+
+model Notification {
+  id            String    @id @default(cuid())
+  
+  // 알림 정보
+  type          String    // PROJECT_UPDATE, TASK_ASSIGNED, BUDGET_ALERT, MILESTONE_DUE, SYSTEM
+  title         String
+  message       String
+  link          String?   // 클릭 시 이동할 URL
+  
+  // 상태
+  isRead        Boolean   @default(false)
+  readAt        DateTime?
+  
+  // 수신자
+  userId        String
+  
+  createdAt     DateTime  @default(now())
+}
