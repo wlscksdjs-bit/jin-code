@@ -40,7 +40,11 @@ async function getDashboardData() {
     delayedProjects,
     upcomingMilestones,
     recentFinances,
-    completedThisMonth
+    completedThisMonth,
+    costEstimateSummary,
+    costExecutionSummary,
+    salesSummary,
+    profitAnalysis
   ] = await Promise.all([
     prisma.project.count(),
     prisma.project.count({ where: { status: { not: 'COMPLETED' } } }),
@@ -94,6 +98,19 @@ async function getDashboardData() {
           gte: new Date(today.getFullYear(), today.getMonth(), 1)
         }
       }
+    }),
+    prisma.costEstimate.aggregate({
+      _sum: { contractAmount: true, operatingProfit: true }
+    }),
+    prisma.costExecution.aggregate({
+      _sum: { totalManufacturingCost: true, operatingProfit: true }
+    }),
+    prisma.sales.aggregate({
+      where: { status: { in: ['WON', 'SUBMITTED', 'EVALUATING'] } },
+      _sum: { contractAmount: true, bidAmount: true }
+    }),
+    prisma.project.aggregate({
+      _sum: { contractAmount: true }
     })
   ])
 
@@ -114,7 +131,13 @@ async function getDashboardData() {
     delayedProjects,
     upcomingMilestones,
     recentFinances,
-    completedThisMonth
+    completedThisMonth,
+    totalEstimateAmount: costEstimateSummary._sum.contractAmount || 0,
+    totalEstimateProfit: costEstimateSummary._sum.operatingProfit || 0,
+    totalExecutionCost: costExecutionSummary._sum.totalManufacturingCost || 0,
+    totalExecutionProfit: costExecutionSummary._sum.operatingProfit || 0,
+    potentialContract: salesSummary._sum.bidAmount || 0,
+    totalProjectContract: profitAnalysis._sum.contractAmount || 0
   }
 }
 
@@ -275,6 +298,85 @@ export default async function DashboardPage() {
           )
         })}
       </div>
+
+      {/* Cost Summary Cards */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="w-5 h-5 text-green-500" />
+            원가 요약 (견적 vs 실행)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <div className="text-sm text-blue-600 mb-1">총 견적금액</div>
+              <div className="text-xl font-bold">{formatCurrency(data.totalEstimateAmount)}</div>
+            </div>
+            <div className={`p-4 rounded-lg ${data.totalEstimateProfit >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+              <div className={`text-sm mb-1 ${data.totalEstimateProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>견적이익</div>
+              <div className={`text-xl font-bold ${data.totalEstimateProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {data.totalEstimateProfit >= 0 ? '+' : ''}{formatCurrency(data.totalEstimateProfit)}
+              </div>
+            </div>
+            <div className="p-4 bg-orange-50 rounded-lg">
+              <div className="text-sm text-orange-600 mb-1">총 실행원가</div>
+              <div className="text-xl font-bold">{formatCurrency(data.totalExecutionCost)}</div>
+            </div>
+            <div className={`p-4 rounded-lg ${data.totalExecutionProfit >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+              <div className={`text-sm mb-1 ${data.totalExecutionProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>실행이익</div>
+              <div className={`text-xl font-bold ${data.totalExecutionProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {data.totalExecutionProfit >= 0 ? '+' : ''}{formatCurrency(data.totalExecutionProfit)}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Link href="/cost">
+              <Button variant="outline" size="sm">
+                원가 관리 →
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Business Plan vs Actual */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-purple-500" />
+            사업 계획 대비 현황
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="p-4 bg-purple-50 rounded-lg">
+              <div className="text-sm text-purple-600 mb-1">총 계약금액</div>
+              <div className="text-xl font-bold">{formatCurrency(data.totalProjectContract)}</div>
+              <div className="text-xs text-purple-500 mt-1">진행 중인 입찰: {formatCurrency(data.potentialContract)}</div>
+            </div>
+            <div className="p-4 bg-green-50 rounded-lg">
+              <div className="text-sm text-green-600 mb-1">견적·실행 이익</div>
+              <div className={`text-xl font-bold ${data.totalExecutionProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {data.totalExecutionProfit >= 0 ? '+' : ''}{formatCurrency(data.totalExecutionProfit)}
+              </div>
+              <div className="text-xs text-green-500 mt-1">견적 이익: {formatCurrency(data.totalEstimateProfit)}</div>
+            </div>
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <div className="text-sm text-blue-600 mb-1">수주 프로젝트</div>
+              <div className="text-xl font-bold">{data.totalSales}건</div>
+              <div className="text-xs text-blue-500 mt-1">진행 중: {data.activeProjects}건</div>
+            </div>
+            <div className="p-4 bg-orange-50 rounded-lg">
+              <div className="text-sm text-orange-600 mb-1">예산 사용률</div>
+              <div className="text-xl font-bold">{budgetProgress}%</div>
+              <div className="text-xs text-orange-500 mt-1">
+                {formatCurrency(data.totalActual)} / {formatCurrency(data.totalBudget)}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Status Cards */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

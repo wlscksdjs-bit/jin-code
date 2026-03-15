@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { getStatusColor, getProjectTypeLabel, formatDate, formatCurrency } from '@/lib/utils'
 import { 
   FolderKanban, MapPin, Calendar, DollarSign, 
-  Users, Edit, Trash2, ArrowLeft 
+  Users, Edit, Trash2, ArrowLeft, Copy, TrendingUp, TrendingDown
 } from 'lucide-react'
 import Link from 'next/link'
 import { deleteProject } from '@/app/actions/projects'
@@ -29,6 +29,13 @@ async function getProject(id: string) {
       },
       budgets: { orderBy: { createdAt: 'desc' }, take: 1 },
       sales: { orderBy: { createdAt: 'desc' }, take: 1 },
+      costEstimates: { orderBy: { createdAt: 'desc' }, take: 5 },
+      costExecutions: { orderBy: { recordedDate: 'desc' }, take: 12 },
+      timeSheets: { 
+        orderBy: { date: 'desc' },
+        include: { user: { select: { id: true, name: true } } },
+        take: 20
+      },
     },
   })
 }
@@ -250,6 +257,127 @@ export default async function ProjectDetailPage({
         <Card className="lg:col-span-2">
           <CardContent className="pt-6">
             <ProfitLossCard data={profitLossData} />
+          </CardContent>
+        </Card>
+
+        {/* Cost Management */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              원가 현황 (견적 vs 실행)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {project.costEstimates.length === 0 && project.costExecutions.length === 0 ? (
+              <p className="text-slate-500 text-center py-4">등록된 원가 정보가 없습니다</p>
+            ) : (
+              <>
+                {project.costEstimates.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm text-slate-500">견적원가</h4>
+                    {project.costEstimates.map((ce) => (
+                      <div key={ce.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                        <div>
+                          <div className="font-medium">{ce.title}</div>
+                          <div className={`px-2 py-0.5 rounded text-xs inline-block mt-1 ${
+                            ce.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+                            ce.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100'
+                          }`}>
+                            {ce.status}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold">{formatCurrency(ce.contractAmount)}</div>
+                          <div className={`text-sm ${ce.operatingProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {ce.operatingProfit >= 0 ? <TrendingUp className="w-4 h-4 inline mr-1" /> : <TrendingDown className="w-4 h-4 inline mr-1" />}
+                            {ce.profitRate.toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {project.costExecutions.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm text-slate-500">실행원가</h4>
+                    {project.costExecutions.slice(0, 3).map((ex) => (
+                      <div key={ex.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                        <div>
+                          <div className="font-medium">{ex.type} - {ex.periodYear}/{ex.periodMonth || '-'}</div>
+                          <div className={`px-2 py-0.5 rounded text-xs inline-block mt-1 ${
+                            ex.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' : 
+                            ex.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100'
+                          }`}>
+                            {ex.status}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold">{formatCurrency(ex.totalManufacturingCost)}</div>
+                          <div className={`text-sm ${ex.operatingProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {ex.operatingProfit >= 0 ? <TrendingUp className="w-4 h-4 inline mr-1" /> : <TrendingDown className="w-4 h-4 inline mr-1" />}
+                            {ex.operatingProfit.toLocaleString()}원
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            <div className="flex gap-2 pt-2">
+              <Link href="/cost">
+                <Button variant="outline" size="sm">
+                  원가 관리 →
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* TimeSheet */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              인력 투입 현황 (TimeSheet)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {project.timeSheets.length === 0 ? (
+              <p className="text-slate-500 text-center py-4">등록된 근무시간이 없습니다</p>
+            ) : (
+              <div className="space-y-2">
+                {project.timeSheets.slice(0, 10).map((ts) => (
+                  <div key={ts.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <div>
+                      <div className="font-medium">{ts.user.name || 'Unknown'}</div>
+                      <div className="text-xs text-slate-500">
+                        {new Date(ts.date).toLocaleDateString('ko-KR')} · {ts.workType}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold">{ts.hours}h</div>
+                      {ts.totalCost && (
+                        <div className="text-xs text-slate-500">{formatCurrency(ts.totalCost)}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {project.timeSheets.length > 10 && (
+                  <p className="text-center text-sm text-slate-500 pt-2">
+                    +{project.timeSheets.length - 10}건 더보기
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="flex gap-2 pt-2">
+              <Link href="/resources">
+                <Button variant="outline" size="sm">
+                  인력 관리 →
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
 

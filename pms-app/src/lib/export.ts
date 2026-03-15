@@ -101,6 +101,7 @@ export function formatDate(date: Date | string): string {
 }
 
 export function exportToExcel(data: any[], filename: string) {
+  const csvContent = data.map(row => Object.values(row).join(',')).join('\n')
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
@@ -110,7 +111,7 @@ export function exportToExcel(data: any[], filename: string) {
 
 export function exportToXLSX<T extends Record<string, any>>(
   data: T[],
-  columns: { key: keyof T; header: string }[],
+  columns: { key: string; header: string }[],
   filename: string
 ) {
   const transformed = data.map(row => {

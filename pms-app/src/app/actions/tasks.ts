@@ -67,11 +67,11 @@ export async function getTask(formData: FormData) {
   try {
     const rawData = Object.fromEntries(formData.entries())
     const validated = IdSchema.safeParse(rawData.id)
-    if (!validated.success) return { success: false, error: validated.error.errors }
+    if (!validated.success) return { success: false, error: validated.error.issues }
     
     const data = await prisma.task.findUnique({
       where: { id: validated.data },
-      include: { project: true, assignee: true, wbsItem: true },
+      include: { project: true, assignee: true },
     })
     return { success: true, data }
   } catch (error) {

@@ -112,7 +112,7 @@ export async function getSales(formData: FormData) {
   try {
     const rawData = Object.fromEntries(formData.entries())
     const validated = IdSchema.safeParse(rawData.id)
-    if (!validated.success) return { success: false, error: validated.error.errors }
+    if (!validated.success) return { success: false, error: validated.error.issues }
     
     const data = await prisma.sales.findUnique({
       where: { id: validated.data },
