@@ -136,7 +136,7 @@ export default async function BudgetPage() {
               {formatCurrency(Math.abs(totalVariance))}
             </div>
             <p className="text-xs text-slate-500">
-              {totalRate.toFixed(1)}%執行
+              {totalRate.toFixed(1)}%실행
             </p>
           </CardContent>
         </Card>

@@ -18,14 +18,13 @@ const salesStatuses = [
   { value: 'DRAFT', label: '작성중' },
   { value: 'SUBMITTED', label: '제출됨' },
   { value: 'EVALUATING', label: '평가중' },
-  { value: 'WON', label: '수주成功' },
+  { value: 'WON', label: '수주성공' },
   { value: 'LOST', label: '수주실패' },
-  { value: 'CANCELLED', label: '취소' },
 ]
 
 const bidResults = [
   { value: 'PENDING', label: '진행중' },
-  { value: 'WON', label: '수주成功' },
+  { value: 'WON', label: '수주성공' },
   { value: 'LOST', label: '수주실패' },
 ]
 

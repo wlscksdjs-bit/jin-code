@@ -169,7 +169,7 @@ export async function convertWonToProject(salesId: string) {
     }
 
     if (sales.status !== 'WON') {
-      return { success: false, error: '수주成功的 영업서류만 프로젝트로 전환할 수 있습니다.' }
+      return { success: false, error: '수주성공한 영업서류만 프로젝트로 전환할 수 있습니다.' }
     }
 
     if (sales.projectId) {

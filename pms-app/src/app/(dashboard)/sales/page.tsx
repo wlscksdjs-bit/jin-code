@@ -104,7 +104,7 @@ export default async function SalesPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm">수주成功</CardTitle>
+            <CardTitle className="text-sm">수주성공</CardTitle>
             <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
