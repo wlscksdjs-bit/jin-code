@@ -12,19 +12,32 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { 
-      projectId, costEstimateId, type, periodYear, periodMonth, status,
-      contractAmount, sellingAdminRate,
-      materialCost, laborCost,
-      outsourceFabrication, outsourceService,
-      consumableOther, consumableSafety,
-      travelExpense, insuranceWarranty, dormitoryCost, miscellaneous, paymentFeeOther,
-      rentalForklift, rentalOther,
-      vehicleRepair, vehicleFuel, vehicleOther,
-      welfareBusiness, reserveFund,
-      indirectCost,
-      description
-    } = body
+    const { projectId, costEstimateId, type, periodYear, periodMonth, status, description } = body
+
+    const costs = body.costs || {}
+    const materialCost = body.materialCost ?? costs.materialCost ?? 0
+    const laborCost = body.laborCost ?? costs.laborCost ?? 0
+    const outsourceFabrication = body.outsourceFabrication ?? costs.outsourceFabrication ?? 0
+    const outsourceService = body.outsourceService ?? costs.outsourceService ?? 0
+    const consumableOther = body.consumableOther ?? costs.consumableOther ?? 0
+    const consumableSafety = body.consumableSafety ?? costs.consumableSafety ?? 0
+    const travelExpense = body.travelExpense ?? costs.travelExpense ?? 0
+    const insuranceWarranty = body.insuranceWarranty ?? costs.insuranceWarranty ?? 0
+    const dormitoryCost = body.dormitoryCost ?? costs.dormitoryCost ?? 0
+    const miscellaneous = body.miscellaneous ?? costs.miscellaneous ?? 0
+    const indirectCost = body.indirectCost ?? costs.indirectCost ?? 0
+
+    const paymentFeeOther = body.paymentFeeOther ?? costs.paymentFeeOther ?? 0
+    const rentalForklift = body.rentalForklift ?? costs.rentalForklift ?? 0
+    const rentalOther = body.rentalOther ?? costs.rentalOther ?? 0
+    const vehicleRepair = body.vehicleRepair ?? costs.vehicleRepair ?? 0
+    const vehicleFuel = body.vehicleFuel ?? costs.vehicleFuel ?? 0
+    const vehicleOther = body.vehicleOther ?? costs.vehicleOther ?? 0
+    const welfareBusiness = body.welfareBusiness ?? costs.welfareBusiness ?? 0
+    const reserveFund = body.reserveFund ?? costs.reserveFund ?? 0
+
+    const contractAmount = body.contractAmount ?? 0
+    const sellingAdminRate = body.sellingAdminRate ?? 12
 
     if (!projectId || !type || !periodYear) {
       return NextResponse.json(

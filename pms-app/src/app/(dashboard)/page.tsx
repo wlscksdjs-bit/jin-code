@@ -24,10 +24,12 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate, getStatusColor, getProjectTypeLabel } from '@/lib/utils'
 import Link from 'next/link'
+import { checkMilestoneDueAlerts } from '@/app/actions/alerts'
 
 async function getDashboardData() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
 
   const [
     totalProjects,
@@ -44,7 +46,12 @@ async function getDashboardData() {
     costEstimateSummary,
     costExecutionSummary,
     salesSummary,
-    profitAnalysis
+    profitAnalysis,
+    // 추가 데이터 조회
+    salesByStatus,
+    cashFlowSummary,
+    projectProfitability,
+    purchaseOrderStats
   ] = await Promise.all([
     prisma.project.count(),
     prisma.project.count({ where: { status: { not: 'COMPLETED' } } }),
@@ -94,9 +101,7 @@ async function getDashboardData() {
     prisma.project.count({
       where: {
         status: 'COMPLETED',
-        updatedAt: {
-          gte: new Date(today.getFullYear(), today.getMonth(), 1)
-        }
+        updatedAt: { gte: startOfMonth }
       }
     }),
     prisma.costEstimate.aggregate({
@@ -111,6 +116,44 @@ async function getDashboardData() {
     }),
     prisma.project.aggregate({
       _sum: { contractAmount: true }
+    }),
+    // PMS 2.0: Sales Pipeline
+    prisma.sales.groupBy({
+      by: ['status'],
+      _count: true,
+    }),
+    // PMS 2.0: Cash Flow
+    prisma.cashFlow.aggregate({
+      _sum: { plannedAmount: true, actualAmount: true },
+      where: { type: 'OUTFLOW' }
+    }),
+    // PMS 2.0: Project Profitability
+    prisma.project.findMany({
+      where: { 
+        status: { in: ['CONTRACT', 'DESIGN', 'CONSTRUCTION'] },
+        contractAmount: { not: null }
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        contractAmount: true,
+        costEstimates: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { operatingProfit: true }
+        },
+        costExecutions: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { totalManufacturingCost: true, operatingProfit: true }
+        }
+      }
+    }),
+    // PMS 2.0: Purchase Orders
+    prisma.purchaseOrder.aggregate({
+      _sum: { totalAmount: true, paidAmount: true },
+      _count: true
     })
   ])
 
@@ -119,7 +162,31 @@ async function getDashboardData() {
     return acc
   }, {} as Record<string, number>)
 
-  return {
+    // Sales Pipeline
+    const salesPipeline = salesByStatus.reduce((acc, s) => {
+      acc[s.status] = s._count
+      return acc
+    }, {} as Record<string, number>)
+
+    // Project profitability
+    const projectProfits = projectProfitability.map(p => {
+      const latestExecution = p.costExecutions[0]
+      const executionCost = latestExecution?.totalManufacturingCost || 0
+      const executionProfit = latestExecution?.operatingProfit || 0
+      const profit = executionProfit || ((p.contractAmount || 0) - executionCost)
+      const profitRate = p.contractAmount ? (profit / p.contractAmount) * 100 : 0
+      return {
+        id: p.id,
+        name: p.name,
+        code: p.code,
+        contractAmount: p.contractAmount || 0,
+        totalCost: executionCost,
+        profit,
+        profitRate
+      }
+    }).sort((a, b) => b.profitRate - a.profitRate)
+
+    return {
     totalProjects,
     activeProjects,
     totalSales,
@@ -137,7 +204,12 @@ async function getDashboardData() {
     totalExecutionCost: costExecutionSummary._sum.totalManufacturingCost || 0,
     totalExecutionProfit: costExecutionSummary._sum.operatingProfit || 0,
     potentialContract: salesSummary._sum.bidAmount || 0,
-    totalProjectContract: profitAnalysis._sum.contractAmount || 0
+    totalProjectContract: profitAnalysis._sum.contractAmount || 0,
+    salesPipeline,
+    cashFlowOutflow: cashFlowSummary._sum.actualAmount || 0,
+    purchaseOrderTotal: purchaseOrderStats._sum.totalAmount || 0,
+    purchaseOrderPaid: purchaseOrderStats._sum.paidAmount || 0,
+    projectProfits
   }
 }
 
@@ -146,6 +218,10 @@ export default async function DashboardPage() {
   
   if (!session) {
     redirect('/login')
+  }
+
+  if (session.user.role === 'ADMIN' || session.user.role === 'PM') {
+    checkMilestoneDueAlerts(session.user.id)
   }
 
   const data = await getDashboardData()
@@ -337,6 +413,84 @@ export default async function DashboardPage() {
               </Button>
             </Link>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-purple-500" />
+            수주영업 현황
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {[
+              { label: '신규', count: data.salesPipeline.DRAFT || 0, color: 'blue' },
+              { label: '제출', count: data.salesPipeline.SUBMITTED || 0, color: 'cyan' },
+              { label: '평가중', count: data.salesPipeline.EVALUATING || 0, color: 'yellow' },
+              { label: '수주', count: data.salesPipeline.WON || 0, color: 'green' },
+              { label: '실패', count: data.salesPipeline.LOST || 0, color: 'red' },
+            ].map((item) => (
+              <div key={item.label} className="p-3 bg-slate-50 rounded-lg text-center">
+                <div className={`text-2xl font-bold text-${item.color}-600`}>{item.count}</div>
+                <div className="text-xs text-slate-500">{item.label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Link href="/sales">
+              <Button variant="outline" size="sm">
+                영업수주 →
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-green-500" />
+            프로젝트별 손익 현황
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {data.projectProfits.length === 0 ? (
+            <div className="text-center py-6 text-slate-500 text-sm">
+              진행 중인 계약 프로젝트가 없습니다
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {data.projectProfits.slice(0, 5).map((project) => (
+                <Link
+                  key={project.id}
+                  href={`/projects/${project.id}`}
+                  className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{project.name}</div>
+                    <div className="text-xs text-slate-500">
+                      계약: {formatCurrency(project.contractAmount)}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`font-bold ${
+                      project.profit >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {project.profit >= 0 ? '+' : ''}{formatCurrency(project.profit)}
+                    </div>
+                    <div className={`text-xs ${
+                      project.profitRate >= 10 ? 'text-green-600' :
+                      project.profitRate >= 0 ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      {project.profitRate.toFixed(1)}%
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

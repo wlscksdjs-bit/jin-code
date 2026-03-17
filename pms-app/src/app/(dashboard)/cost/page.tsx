@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
+import Link from 'next/link'
 import { 
   Calculator, Upload, Download,
-  TrendingUp, TrendingDown, Save
+  TrendingUp, TrendingDown, Save, Plus, FileText, Calendar
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,6 +13,8 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/toast'
 import { createCostTemplate, parseCostExcel, aggregateCostItems } from '@/lib/excel-template'
 import { CostItemsTable, type CostTableItem } from '@/components/cost/cost-items-table'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import { CostExecutionsExportButton } from '@/components/cost/cost-executions-export-button'
 
 type Project = { id: string; name: string; code: string }
 
@@ -35,11 +38,14 @@ export default function CostManagementPage() {
   const { addToast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [projects, setProjects] = useState<Project[]>([])
+  const [executions, setExecutions] = useState<any[]>([])
   const [formData, setFormData] = useState<CostFormData>(initialFormData)
   const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<'estimate' | 'monthly'>('estimate')
 
   useEffect(() => {
     fetchProjects()
+    fetchExecutions()
   }, [])
 
   const fetchProjects = async () => {
@@ -49,6 +55,16 @@ export default function CostManagementPage() {
       setProjects(data.projects || [])
     } catch (error) {
       console.error('Error fetching projects:', error)
+    }
+  }
+
+  const fetchExecutions = async () => {
+    try {
+      const res = await fetch('/api/cost-execution')
+      const data = await res.json()
+      setExecutions(data.costExecutions || [])
+    } catch (error) {
+      console.error('Error fetching executions:', error)
     }
   }
 
@@ -220,18 +236,55 @@ export default function CostManagementPage() {
           <h1 className="text-2xl font-bold">원가 관리</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExcelDownload}>
-            <Download className="w-4 h-4 mr-2" />
-            양식 다운로드
-          </Button>
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-            <Upload className="w-4 h-4 mr-2" />
-            엑셀 업로드
-          </Button>
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleExcelUpload} className="hidden" />
+          {activeTab === 'monthly' ? (
+            <Link href="/cost/monthly">
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                월별 원가 입력
+              </Button>
+            </Link>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleExcelDownload}>
+                <Download className="w-4 h-4 mr-2" />
+                양식 다운로드
+              </Button>
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-4 h-4 mr-2" />
+                엑셀 업로드
+              </Button>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleExcelUpload} className="hidden" />
+            </>
+          )}
         </div>
       </div>
 
+      <div className="flex gap-1 border-b">
+        <button
+          onClick={() => setActiveTab('estimate')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'estimate'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <FileText className="w-4 h-4 inline mr-2" />
+          견적원가
+        </button>
+        <button
+          onClick={() => setActiveTab('monthly')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'monthly'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Calendar className="w-4 h-4 inline mr-2" />
+          월별 원가
+        </button>
+      </div>
+
+      {activeTab === 'estimate' ? (
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 space-y-6">
           <Card>
@@ -372,6 +425,89 @@ export default function CostManagementPage() {
           </Card>
         </div>
       </div>
+      ) : (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>월별 원가 현황</CardTitle>
+            <div className="flex gap-2">
+              <Link href="/cost/monthly">
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  월별 원가 입력
+                </Button>
+              </Link>
+              {executions.length > 0 && (
+                <CostExecutionsExportButton executions={executions} />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {executions.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>등록된 월별 원가가 없습니다.</p>
+                <Link href="/cost/monthly">
+                  <Button variant="outline" className="mt-4">
+                    첫 월별 원가 입력
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-2 text-sm font-medium text-slate-500">기간</th>
+                      <th className="text-left py-3 px-2 text-sm font-medium text-slate-500">프로젝트</th>
+                      <th className="text-right py-3 px-2 text-sm font-medium text-slate-500">제조원가</th>
+                      <th className="text-right py-3 px-2 text-sm font-medium text-slate-500">영업이익</th>
+                      <th className="text-right py-3 px-2 text-sm font-medium text-slate-500">이익률</th>
+                      <th className="text-center py-3 px-2 text-sm font-medium text-slate-500">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {executions.map((exec) => (
+                      <tr key={exec.id} className="border-b hover:bg-slate-50">
+                        <td className="py-3 px-2">
+                          {exec.periodYear}년 {exec.periodMonth}월
+                        </td>
+                        <td className="py-3 px-2">
+                          <Link href={`/projects/${exec.project?.id}`} className="text-blue-600 hover:underline">
+                            {exec.project?.name}
+                          </Link>
+                        </td>
+                        <td className="py-3 px-2 text-right font-mono">
+                          {formatCurrency(exec.totalManufacturingCost)}
+                        </td>
+                        <td className={`py-3 px-2 text-right font-mono ${exec.operatingProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {exec.operatingProfit >= 0 ? '+' : ''}{formatCurrency(exec.operatingProfit)}
+                        </td>
+                        <td className={`py-3 px-2 text-right ${
+                          exec.grossProfit / (exec.contractAmount || 1) >= 0.1 ? 'text-green-600' :
+                          exec.grossProfit / (exec.contractAmount || 1) >= 0 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {((exec.grossProfit / (exec.contractAmount || 1)) * 100).toFixed(1)}%
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            exec.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
+                            exec.status === 'SUBMITTED' ? 'bg-blue-100 text-blue-700' :
+                            'bg-slate-100 text-slate-700'
+                          }`}>
+                            {exec.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      )}
     </div>
   )
 }
