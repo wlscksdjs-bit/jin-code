@@ -16,6 +16,11 @@ import { ResourceAllocation } from '@/components/resource-allocation'
 import { ProfitLossCard } from '@/components/profit-loss-card'
 import { AddWbsForm } from '@/components/projects/add-wbs-form'
 import { calculateProfitLoss } from '@/app/actions/profit-loss'
+import { CashFlowChart } from '@/components/dashboard/cash-flow-chart'
+import { ProjectPrintButton } from '@/components/projects/project-print-button'
+import { KPICard } from '@/components/dashboard/kpi-card'
+import { calculateProjectKPI } from '@/lib/kpi'
+import { calculateCPM, generateCPMFromWbsItems } from '@/lib/cpm'
 
 async function getProject(id: string) {
   return prisma.project.findUnique({
@@ -36,6 +41,10 @@ async function getProject(id: string) {
         include: { user: { select: { id: true, name: true } } },
         take: 20
       },
+      cashFlows: { 
+        orderBy: { plannedDate: 'asc' }, 
+        take: 24 
+      }
     },
   })
 }
@@ -67,7 +76,41 @@ export default async function ProjectDetailPage({
     redirect('/projects')
   }
 
+  const monthlyDataMap = new Map<string, { month: string, inflow: number, outflow: number, balance: number }>()
+  
+  project.cashFlows.forEach(cf => {
+    const month = cf.plannedDate.toISOString().substring(0, 7)
+    const current = monthlyDataMap.get(month) || { month, inflow: 0, outflow: 0, balance: 0 }
+    
+    if (cf.type === 'INFLOW') {
+      current.inflow += cf.plannedAmount
+    } else {
+      current.outflow += cf.plannedAmount
+    }
+    
+    monthlyDataMap.set(month, current)
+  })
+
+  const cashFlowChartData = Array.from(monthlyDataMap.values())
+    .sort((a, b) => a.month.localeCompare(b.month))
+  
+  let runningBalance = 0
+  cashFlowChartData.forEach(data => {
+    runningBalance += (data.inflow - data.outflow)
+    data.balance = runningBalance
+  })
+
   const deleteAction = deleteProject.bind(null, project.id)
+
+  const kpi = calculateProjectKPI(
+    project.wbsItems,
+    project.costExecutions,
+    project.startDate,
+    project.endDate
+  )
+
+  const cpmResult = calculateCPM(generateCPMFromWbsItems(project.wbsItems))
+  const criticalPathCount = cpmResult.criticalPath.length
 
   return (
     <div className="space-y-6">
@@ -84,6 +127,7 @@ export default async function ProjectDetailPage({
           </div>
         </div>
         <div className="flex gap-2">
+          <ProjectPrintButton project={project} />
           <Link href={`/projects/${project.id}/edit`}>
             <Button variant="outline">
               <Edit className="w-4 h-4 mr-2" />
@@ -392,6 +436,19 @@ export default async function ProjectDetailPage({
             </CardContent>
           </Card>
         )}
+
+        <div className="lg:col-span-2">
+          <KPICard
+            cpi={kpi.cpi}
+            spi={kpi.spi}
+            vac={kpi.vac}
+            progress={kpi.progress}
+          />
+        </div>
+
+        <div className="lg:col-span-2">
+          <CashFlowChart data={cashFlowChartData} />
+        </div>
       </div>
     </div>
   )

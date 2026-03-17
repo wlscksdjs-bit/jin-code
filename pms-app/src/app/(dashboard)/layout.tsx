@@ -18,7 +18,9 @@ import {
   DollarSign,
   Shield,
   Bell,
-  Receipt
+  Receipt,
+  Package,
+  Building2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -34,6 +36,8 @@ const navigation = [
   { name: '공사진행', href: '/progress', icon: BarChart3, roles: ['ADMIN', 'PM', 'STAFF'] },
   { name: '손익관리', href: '/finance', icon: DollarSign, roles: ['ADMIN', 'PM'] },
   { name: '인원리소스', href: '/resources', icon: Users, roles: ['ADMIN', 'PM'] },
+  { name: '발주관리', href: '/orders', icon: Package, roles: ['ADMIN', 'PM'] },
+  { name: '거래처', href: '/vendors', icon: Building2, roles: ['ADMIN', 'PM'] },
   { name: '알림', href: '/notifications', icon: Bell, roles: ['ADMIN', 'PM', 'STAFF'] },
 ]
 

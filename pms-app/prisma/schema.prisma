@@ -105,6 +105,15 @@ model Project {
   currentOperatingProfit Float?
   currentProfitRate      Float?
 
+  // PMS 2.0: 자금 관리
+  totalCashInflow        Float   @default(0)
+  totalCashOutflow       Float   @default(0)
+  currentCashBalance     Float   @default(0)
+
+  // PMS 2.0: 예산 관리
+  budgetUsageRate        Float   @default(0)
+  costForecastRate       Float   @default(0)
+
   // Relations
   customerId      String?
   customer        Customer?     @relation(fields: [customerId], references: [id])
@@ -123,6 +132,12 @@ model Project {
   costEstimates  CostEstimate[]
   costActuals    CostActual[]
   costExecutions CostExecution[]
+
+  // PMS 2.0 Relations
+  workflow        ProjectWorkflow?
+  purchaseOrders  PurchaseOrder[]
+  cashFlows       CashFlow[]
+  monthlySnapshots MonthlyCostSnapshot[]
 }
 
 model ProjectMember {
@@ -332,12 +347,20 @@ model WbsItem {
   // 마일스톤
   isMilestone     Boolean   @default(false) // 마일스톤 여부
   milestoneType   String?   // 마일스톤 유형
+  // PROJECT_START, CONTRACT, DESIGN_COMPLETE,
+  // PROCUREMENT_COMPLETE, CONSTRUCTION_START,
+  // CONSTRUCTION_COMPLETE, COMMISSIONING, HANDOVER
 
+  // PMS 2.0: 구매 연동
+  isProcurement   Boolean   @default(false) // 구매 공정 여부
+  assignedVendorId String?  // 배분된 거래처
+  
   projectId       String
   project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   progressRecords Progress[]
   componentOrders ComponentOrder[]
+  purchaseOrders  PurchaseOrder[]
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -916,4 +939,251 @@ model CostActualItem {
   
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// ============================================
+// 15. 프로젝트 라이프사이클 워크플로우 (PMS 2.0)
+// ============================================
+
+model ProjectWorkflow {
+  id              String    @id @default(cuid())
+  projectId       String    @unique
+  
+  // 현재 단계: BIDDING → CONTRACT → DESIGN → PROCUREMENT → CONSTRUCTION → COMPLETED
+  currentPhase    String    @default("BIDDING")
+  
+  // 연동된 엔티티
+  salesId          String?
+  activeCostEstimateId    String?
+  activeCostExecutionId    String?
+  latestCostActualId       String?
+  
+  // 일정 추적
+  currentPhaseStart DateTime?
+  currentPhaseEnd   DateTime?
+  
+  // 상태
+  status          String    @default("ACTIVE") // ACTIVE, ON_HOLD, COMPLETED, CANCELLED
+  
+  // 상세
+  notes           String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// 16. 거래처 관리 (Vendor)
+// ============================================
+
+model Vendor {
+  id            String    @id @default(cuid())
+  
+  // 기본 정보
+  name          String
+  code          String    @unique // 거래처 코드
+  category      String    @default("MATERIAL") // MATERIAL, EQUIPMENT, SERVICE, LABOR
+  
+  // 사업자 정보
+  businessNumber String?
+  
+  // 연락처
+  contactPerson String?
+  contactPhone  String?
+  contactEmail  String?
+  address       String?
+  
+  // 은행정보
+  bankName      String?
+  accountNumber String?
+  accountHolder String?
+  
+  // 상태
+  isActive      Boolean   @default(true)
+  
+  // 상세
+  description   String?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  orders        PurchaseOrder[]
+}
+
+// ============================================
+// 17. 발주 관리 (Purchase Order)
+// ============================================
+
+model PurchaseOrder {
+  id              String    @id @default(cuid())
+  orderNumber     String    @unique // PO-2026-0001
+  
+  // 프로젝트/공정 연동
+  projectId       String
+  wbsItemId       String?
+  wbsItem         WbsItem?  @relation(fields: [wbsItemId], references: [id])
+  
+  // 거래처
+  vendorId        String
+  vendor          Vendor    @relation(fields: [vendorId], references: [id])
+  
+  // 발주 정보
+  title           String    // 발주 제목
+  description     String?
+  
+  // 일정
+  orderDate       DateTime
+  requiredDate    DateTime? // 요구 납기일
+  deliveryDate    DateTime? // 실제 납기일
+  
+  // 금액
+  subtotal        Float     @default(0)  // 소계
+  tax             Float     @default(0)  // 부가세
+  totalAmount     Float     @default(0)  // 총액
+  paidAmount      Float     @default(0)  // 결제액
+  
+  // 상태: DRAFT → SENT → PARTIAL → RECEIVED → INSTALLED → CANCELLED
+  status          String    @default("DRAFT")
+  
+  // 상세
+  notes           String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items           PurchaseOrderItem[]
+  
+  @@index([projectId])
+  @@index([vendorId])
+  @@index([status])
+}
+
+model PurchaseOrderItem {
+  id                  String    @id @default(cuid())
+  purchaseOrderId     String
+  purchaseOrder       PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  
+  // 품목 정보
+  itemName            String    // 품목명
+  specification       String?   // 규격
+  unit                String    @default("EA") // 단위
+  
+  // 수량/단가
+  quantity            Float     @default(1)
+  unitPrice           Float     @default(0)
+  amount              Float     // = quantity * unitPrice
+  
+  // 입고 현황
+  orderedQuantity     Float     @default(0)
+  receivedQuantity    Float     @default(0)
+  rejectedQuantity    Float     @default(0)
+  
+  // 상태: PENDING → PARTIAL → RECEIVED → REJECTED
+  status              String    @default("PENDING")
+  
+  // 상세
+  remarks             String?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@index([purchaseOrderId])
+}
+
+// ============================================
+// 18. 자금 흐름 (Cash Flow)
+// ============================================
+
+model CashFlow {
+  id              String    @id @default(cuid())
+  projectId       String
+  
+  // 구분
+  type            String    // INFLOW(수입), OUTFLOW(지출)
+  
+  // 카테고리
+  category        String    @default("OTHER")
+  // 수입: CONTRACT, CHANGE_ORDER, MILESTONE
+  // 지출: MATERIAL, LABOR, OUTSOURCE, EQUIPMENT, RENTAL, TRANSPORT, INSURANCE, TAX, OTHER
+  
+  // 금액
+  plannedAmount   Float     // 계획 금액
+  actualAmount    Float     @default(0) // 실제 금액
+  
+  // 일정
+  plannedDate     DateTime  // 계획일
+  actualDate      DateTime? // 실제 발생일
+  
+  // 상태: PLANNED → COMMITTED → ACTUAL → CANCELLED
+  status          String    @default("PLANNED")
+  
+  // 참조
+  referenceType   String?   // Finance, PurchaseOrder, CostExecution 등
+  referenceId     String?
+  
+  // 설명
+  description     String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@index([projectId])
+  @@index([type])
+  @@index([status])
+  @@index([plannedDate])
+}
+
+// ============================================
+// 19. 월별 실적 집계 (Monthly Cost Snapshot)
+// ============================================
+
+model MonthlyCostSnapshot {
+  id              String    @id @default(cuid())
+  projectId       String
+  
+  // 월별 정보
+  year            Int
+  month           Int
+  
+  // 원가 누적
+  contractAmount  Float     @default(0)
+  materialCost   Float     @default(0)
+  laborCost      Float     @default(0)
+  outsourceCost  Float     @default(0)
+  equipmentCost  Float     @default(0)
+  otherCost      Float     @default(0)
+  
+  // 총 원가
+  totalCost      Float     @default(0)
+  indirectCost   Float     @default(0)
+  
+  // 손익
+  sellingAdminCost Float   @default(0)
+  grossProfit    Float     @default(0)
+  operatingProfit Float     @default(0)
+  profitRate     Float     @default(0)
+  
+  // 예약/실적 구분: true = 실적, false = 예정
+  isActual       Boolean   @default(false)
+  
+  // 상세
+  notes          String?
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  // Relations
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@unique([projectId, year, month, isActual])
+  @@index([projectId])
 }

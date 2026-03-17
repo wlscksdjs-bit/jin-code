@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { GanttChart } from '@/components/gantt-chart'
+import { GanttChartUpdater } from '@/components/projects/gantt-chart-updater'
 import { Button } from '@/components/ui/button'
 import { Plus, Flag } from 'lucide-react'
 
@@ -108,7 +108,7 @@ export function ProjectScheduleView({ wbsItems, projectStartDate, projectEndDate
       </div>
 
       {viewMode === 'gantt' ? (
-        <GanttChart 
+        <GanttChartUpdater 
           tasks={filteredItems} 
           startDate={projectStartDate ? new Date(projectStartDate) : undefined}
           endDate={projectEndDate ? new Date(projectEndDate) : undefined}

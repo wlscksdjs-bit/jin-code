@@ -9,6 +9,7 @@ import { Edit, Trash2, ArrowLeft, TrendingUp, FileText, Users, DollarSign, Calcu
 import Link from 'next/link'
 import { deleteSales } from '@/app/actions/sales'
 import { ConvertToProjectButton } from '@/components/sales/convert-to-project-button'
+import { ConfirmContractButton } from '@/components/sales/confirm-contract-button'
 
 async function getSales(id: string) {
   return prisma.sales.findUnique({
@@ -81,6 +82,13 @@ export default async function SalesDetailPage({
           </div>
         </div>
         <div className="flex gap-2">
+          {!['WON', 'LOST', 'CANCELLED'].includes(sales.status) && (
+            <ConfirmContractButton
+              salesId={sales.id}
+              salesTitle={sales.title}
+              contractAmount={sales.contractAmount}
+            />
+          )}
           {sales.status === 'WON' && (
             <ConvertToProjectButton 
               salesId={sales.id} 
