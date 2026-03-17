@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { 
-  Calculator, Plus, Trash2, Upload, Download, FileSpreadsheet,
-  TrendingUp, TrendingDown, Save, FolderOpen
+  Calculator, Upload, Download,
+  TrendingUp, TrendingDown, Save
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,32 +11,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/toast'
 import { createCostTemplate, parseCostExcel, aggregateCostItems } from '@/lib/excel-template'
+import { CostItemsTable, type CostTableItem } from '@/components/cost/cost-items-table'
 
 type Project = { id: string; name: string; code: string }
-
-type CostItem = {
-  id: string
-  sheet: string
-  category: string
-  subCategory: string
-  description: string
-  vendor: string
-  itemName: string
-  specification: string
-  unit: string
-  quantity: number
-  unitPrice: number
-  amount: number
-  rate?: number
-  notes?: string
-}
 
 type CostFormData = {
   projectId: string
   title: string
   contractAmount: number
   sellingAdminRate: number
-  items: CostItem[]
+  items: CostTableItem[]
 }
 
 const initialFormData: CostFormData = {
@@ -98,13 +82,14 @@ export default function CostManagementPage() {
     }
   }, [formData.items, formData.contractAmount, formData.sellingAdminRate])
 
-  const handleAddItem = (sheet: string, category: string) => {
-    const newItem: CostItem = {
+  const handleAddItem = () => {
+    const newItem: CostTableItem = {
       id: Math.random().toString(36).substr(2, 9),
-      sheet,
-      category,
-      subCategory: '',
+      sheet: '직접공사비',
+      category: '직접공사비',
       description: '',
+      majorCategory: '',
+      subCategory: '',
       vendor: '',
       itemName: '',
       specification: '',
@@ -116,27 +101,30 @@ export default function CostManagementPage() {
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }))
   }
 
-  const handleUpdateItem = (index: number, field: keyof CostItem, value: any) => {
+  const handleUpdateItem = (id: string, field: keyof CostTableItem, value: string | number) => {
     setFormData(prev => {
-      const newItems = [...prev.items]
-      const item = { ...newItems[index] }
-      
-      if (field === 'quantity' || field === 'unitPrice') {
-        item[field] = Number(value)
-        item.amount = item.quantity * item.unitPrice
-      } else {
-        (item as any)[field] = value
-      }
-      
-      newItems[index] = item
+      const newItems = prev.items.map(item => {
+        if (item.id !== id) return item
+        
+        const updated = { ...item }
+        
+        if (field === 'quantity' || field === 'unitPrice') {
+          (updated as any)[field] = Number(value)
+          updated.amount = updated.quantity * updated.unitPrice
+        } else {
+          (updated as any)[field] = value
+        }
+        
+        return updated
+      })
       return { ...prev, items: newItems }
     })
   }
 
-  const handleDeleteItem = (index: number) => {
+  const handleDeleteItem = (id: string) => {
     setFormData(prev => ({
       ...prev,
-      items: prev.items.filter((_, i) => i !== index)
+      items: prev.items.filter(item => item.id !== id)
     }))
   }
 
@@ -147,21 +135,20 @@ export default function CostManagementPage() {
     try {
       const data = await parseCostExcel(file)
       
-      const newItems: CostItem[] = data.items.map((item, idx) => ({
+      const newItems: CostTableItem[] = data.items.map((item, idx) => ({
         id: Math.random().toString(36).substr(2, 9) + idx,
-        sheet: item.sheet,
-        category: item.category,
-        subCategory: item.subCategory,
-        description: item.description,
-        vendor: item.vendor,
+        sheet: item.sheet || '직접공사비',
+        category: item.category || '직접공사비',
+        description: item.description || '',
+        majorCategory: '',
+        subCategory: item.subCategory || '',
+        vendor: item.vendor || '',
         itemName: item.itemName,
         specification: item.specification,
         unit: item.unit,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         amount: item.amount,
-        rate: item.rate,
-        notes: item.notes
       }))
 
       setFormData(prev => ({ 
@@ -224,23 +211,6 @@ export default function CostManagementPage() {
   }
 
   const formatNumber = (num: number) => new Intl.NumberFormat('ko-KR').format(num)
-
-  const groupedItems = useMemo(() => {
-    const groups: Record<string, CostItem[]> = {}
-    formData.items.forEach(item => {
-      const key = item.sheet + '-' + item.category
-      if (!groups[key]) groups[key] = []
-      groups[key].push(item)
-    })
-    return groups
-  }, [formData.items])
-
-  const sheetLabels: Record<string, string> = {
-    '갑지-직접공사비': '갑지 - 직접공사비',
-    '공사원가내역서-직접공사비': '공사원가내역서 - 직접공사비',
-    '공사원가내역서-간접공사비': '공사원가내역서 - 간접공사비',
-    '을지-': '을지 - 품목',
-  }
 
   return (
     <div className="space-y-6">
@@ -315,115 +285,19 @@ export default function CostManagementPage() {
             </CardContent>
           </Card>
 
-          {Object.entries(groupedItems).map(([groupKey, items]) => (
-            <Card key={groupKey}>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>{sheetLabels[groupKey] || groupKey}</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => handleAddItem(items[0]?.sheet || '갑지', items[0]?.category || '직접공사비')}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  품목추가
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {items.length === 0 ? (
-                  <p className="text-center py-4 text-slate-500">품목을 추가하세요</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="px-2 py-2 text-left w-8">#</th>
-                          {groupKey.includes('간접') ? (
-                            <>
-                              <th className="px-2 py-2 text-left">항목</th>
-                              <th className="px-2 py-2 text-left">산출기준</th>
-                              <th className="px-2 py-2 text-left w-16">단위</th>
-                              <th className="px-2 py-2 text-right w-20">비율(%)</th>
-                              <th className="px-2 py-2 text-right w-28">금액</th>
-                            </>
-                          ) : (
-                            <>
-                              <th className="px-2 py-2 text-left">품목명</th>
-                              <th className="px-2 py-2 text-left">규격</th>
-                              <th className="px-2 py-2 text-left w-16">단위</th>
-                              <th className="px-2 py-2 text-right w-20">수량</th>
-                              <th className="px-2 py-2 text-right w-24">단가</th>
-                              <th className="px-2 py-2 text-right w-28">금액</th>
-                            </>
-                          )}
-                          <th className="px-2 py-2 w-8"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map((item) => {
-                          const globalIndex = formData.items.findIndex(i => i.id === item.id)
-                          return (
-                            <tr key={item.id} className="border-t hover:bg-slate-50">
-                              <td className="px-2 py-2">{globalIndex + 1}</td>
-                              {groupKey.includes('간접') ? (
-                                <>
-                                  <td className="px-2 py-2">
-                                    <Input value={item.subCategory} onChange={(e) => handleUpdateItem(globalIndex, 'subCategory', e.target.value)} placeholder="항목명" className="h-8" />
-                                  </td>
-                                  <td className="px-2 py-2">
-                                    <Input value={item.description} onChange={(e) => handleUpdateItem(globalIndex, 'description', e.target.value)} placeholder="산출기준" className="h-8" />
-                                  </td>
-                                  <td className="px-2 py-2">
-                                    <Input value={item.unit} onChange={(e) => handleUpdateItem(globalIndex, 'unit', e.target.value)} className="h-8" />
-                                  </td>
-                                  <td className="px-2 py-2">
-                                    <Input type="number" value={item.rate || ''} onChange={(e) => handleUpdateItem(globalIndex, 'rate', Number(e.target.value))} placeholder="%" className="h-8 text-right" />
-                                  </td>
-                                  <td className="px-2 py-2">
-                                    <Input type="number" value={item.amount || ''} onChange={(e) => handleUpdateItem(globalIndex, 'amount', Number(e.target.value))} className="h-8 text-right" />
-                                  </td>
-                                </>
-                              ) : (
-                                <>
-                                  <td className="px-2 py-2">
-                                    <Input value={item.itemName} onChange={(e) => handleUpdateItem(globalIndex, 'itemName', e.target.value)} placeholder="품목명" className="h-8" />
-                                  </td>
-                                  <td className="px-2 py-2">
-                                    <Input value={item.specification} onChange={(e) => handleUpdateItem(globalIndex, 'specification', e.target.value)} placeholder="규격" className="h-8" />
-                                  </td>
-                                  <td className="px-2 py-2">
-                                    <Input value={item.unit} onChange={(e) => handleUpdateItem(globalIndex, 'unit', e.target.value)} className="h-8" />
-                                  </td>
-                                  <td className="px-2 py-2">
-                                    <Input type="number" value={item.quantity || ''} onChange={(e) => handleUpdateItem(globalIndex, 'quantity', e.target.value)} className="h-8 text-right" />
-                                  </td>
-                                  <td className="px-2 py-2">
-                                    <Input type="number" value={item.unitPrice || ''} onChange={(e) => handleUpdateItem(globalIndex, 'unitPrice', e.target.value)} className="h-8 text-right" />
-                                  </td>
-                                  <td className="px-2 py-2 text-right font-medium">{formatNumber(item.amount)}</td>
-                                </>
-                              )}
-                              <td className="px-2 py-2">
-                                <Button variant="ghost" size="icon" onClick={() => handleDeleteItem(globalIndex)} className="h-8 w-8 text-red-500">
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => handleAddItem('갑지', '직접공사비')}>
-              <FolderOpen className="w-4 h-4 mr-2" />
-              갑지 시트 추가
-            </Button>
-            <Button variant="outline" onClick={() => handleAddItem('공사원가내역서', '직접공사비')}>
-              <FolderOpen className="w-4 h-4 mr-2" />
-              원가내역서 추가
-            </Button>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>원가 항목</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CostItemsTable
+                items={formData.items}
+                onAddItem={handleAddItem}
+                onDeleteItem={handleDeleteItem}
+                onUpdateItem={handleUpdateItem}
+              />
+            </CardContent>
+          </Card>
 
           <Button onClick={handleSubmit} disabled={loading} className="w-full">
             <Save className="w-4 h-4 mr-2" />
