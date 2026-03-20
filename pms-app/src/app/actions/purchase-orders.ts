@@ -3,6 +3,8 @@
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { broadcast } from '@/lib/sse-broadcast'
+import { invalidateDashboard } from './dashboard'
 
 export interface CreatePurchaseOrderInput {
   projectId: string
@@ -187,18 +189,32 @@ export async function receivePurchaseOrder(
   }
 
   try {
+    const order = await prisma.purchaseOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        project: { select: { id: true, name: true, code: true } },
+        items: true,
+        vendor: { select: { id: true, name: true, category: true } },
+      },
+    })
+    if (!order) return { success: false, error: '발주서를 찾을 수 없습니다.' }
+
+    const receivedItemDetails: Array<{
+      itemId: string; itemName: string; specification: string | null;
+      unit: string; quantity: number; unitPrice: number; amount: number;
+    }> = []
+
     for (const itemInput of items) {
       const item = await prisma.purchaseOrderItem.findUnique({
         where: { id: itemInput.itemId },
       })
-
       if (!item) continue
 
-      const receivedQty = itemInput.rejected 
-        ? item.receivedQuantity 
+      const receivedQty = itemInput.rejected
+        ? item.receivedQuantity
         : item.receivedQuantity + itemInput.quantity
-      const rejectedQty = itemInput.rejected 
-        ? item.rejectedQuantity + itemInput.quantity 
+      const rejectedQty = itemInput.rejected
+        ? item.rejectedQuantity + itemInput.quantity
         : item.rejectedQuantity
 
       await prisma.purchaseOrderItem.update({
@@ -209,31 +225,137 @@ export async function receivePurchaseOrder(
           status: receivedQty >= item.orderedQuantity ? 'RECEIVED' : 'PARTIAL',
         },
       })
+
+      if (!itemInput.rejected) {
+        receivedItemDetails.push({
+          itemId: item.id,
+          itemName: item.itemName,
+          specification: item.specification,
+          unit: item.unit,
+          quantity: itemInput.quantity,
+          unitPrice: item.unitPrice,
+          amount: itemInput.quantity * item.unitPrice,
+        })
+      }
     }
 
     const allItems = await prisma.purchaseOrderItem.findMany({
       where: { purchaseOrderId: orderId },
     })
-
-    const allReceived = allItems.every(item => 
+    const allReceived = allItems.every(item =>
       item.receivedQuantity >= item.orderedQuantity
     )
-    const someReceived = allItems.some(item => 
+    const someReceived = allItems.some(item =>
       item.receivedQuantity > 0
     )
-
     const newStatus = allReceived ? 'RECEIVED' : someReceived ? 'PARTIAL' : 'SENT'
 
-    const order = await prisma.purchaseOrder.update({
+    await prisma.purchaseOrder.update({
       where: { id: orderId },
       data: {
         status: newStatus,
         deliveryDate: newStatus === 'RECEIVED' ? new Date() : undefined,
       },
-      include: {
-        project: { select: { id: true, name: true } },
-      },
     })
+
+      if (receivedItemDetails.length > 0) {
+      const subtotal = receivedItemDetails.reduce((s, i) => s + i.amount, 0)
+      const tax = Math.round(subtotal * 0.1)
+      const totalAmount = subtotal + tax
+
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = now.getMonth() + 1
+
+      let execution = await prisma.costExecution.findFirst({
+        where: {
+          projectId: order.projectId,
+          periodYear: year,
+          periodMonth: month,
+        },
+      })
+
+      if (!execution) {
+        execution = await prisma.costExecution.create({
+          data: {
+            projectId: order.projectId,
+            periodYear: year,
+            periodMonth: month,
+            type: 'MONTHLY',
+            status: 'APPROVED',
+            materialCost: 0,
+            totalExpense: 0,
+            totalDirectCost: 0,
+            totalManufacturingCost: 0,
+            contractAmount: order.totalAmount,
+          },
+        })
+      }
+
+      const costActual = await prisma.costActual.create({
+        data: {
+          projectId: order.projectId,
+          type: 'RECEIPT',
+          asOfDate: now,
+          contractAmount: order.totalAmount,
+          materialCost: subtotal,
+          totalExpense: totalAmount,
+          totalDirectCost: subtotal,
+          totalManufacturingCost: totalAmount,
+          sellingAdminRate: 12,
+          sellingAdminCost: Math.round(totalAmount * 0.12),
+          grossProfit: order.totalAmount - totalAmount,
+          operatingProfit: order.totalAmount - totalAmount - Math.round(totalAmount * 0.12),
+          items: {
+            create: receivedItemDetails.map(detail => ({
+              categoryType: 'MATERIAL',
+              costType: 'ACTUAL',
+              amount: detail.amount,
+              description: `${detail.itemName}${detail.specification ? ` (${detail.specification})` : ''} × ${detail.quantity}${detail.unit}`,
+            })),
+          },
+        },
+      })
+
+      const receiptCount = await prisma.materialReceipt.count()
+      const receiptNumber = `MR-${year}-${String(receiptCount + 1).padStart(4, '0')}`
+
+      await prisma.materialReceipt.create({
+        data: {
+          receiptNumber,
+          purchaseOrderId: orderId,
+          receiptDate: now,
+          receivedBy: session.user.name || session.user.id,
+          itemsJson: JSON.stringify(receivedItemDetails),
+          subtotal,
+          tax,
+          totalAmount,
+          status: allReceived ? 'COMPLETE' : 'PARTIAL',
+          costActualId: costActual.id,
+        },
+      })
+
+      await prisma.project.update({
+        where: { id: order.projectId },
+        data: {
+          totalCashOutflow: { increment: totalAmount },
+          currentCashBalance: { decrement: totalAmount },
+        },
+      })
+
+      broadcast('project', {
+        type: 'MATERIAL_RECEIVED',
+        projectId: order.projectId,
+        data: {
+          orderId,
+          orderNumber: order.orderNumber,
+          receiptNumber,
+          amount: totalAmount,
+          materialCost: subtotal,
+          vendorName: order.vendor.name,
+        },
+      })
+    }
 
     await prisma.notification.create({
       data: {
@@ -245,11 +367,17 @@ export async function receivePurchaseOrder(
       },
     })
 
+    if (receivedItemDetails.length > 0) {
+      await invalidateDashboard(order.projectId)
+    }
+
     revalidatePath('/orders')
     revalidatePath(`/orders/${orderId}`)
     revalidatePath(`/projects/${order.projectId}`)
+    revalidatePath('/cost/monthly')
     return { success: true, order }
   } catch (error) {
+    console.error('Error in receivePurchaseOrder:', error)
     return { success: false, error: '입고 처리 중 오류가 발생했습니다.' }
   }
 }

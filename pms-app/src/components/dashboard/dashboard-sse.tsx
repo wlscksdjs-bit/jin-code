@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSSE } from '@/hooks/useSSE'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 
 interface SSEMessage {
   type: string
@@ -13,31 +14,33 @@ interface SSEMessage {
   newPhase?: string
 }
 
-interface DashboardSSEProps {
-  onProjectUpdate?: (projectId: string) => void
-  onCostUpdate?: (projectId: string) => void
-  onPhaseChange?: (projectId: string, newPhase: string) => void
-}
-
-export function DashboardSSE({ onProjectUpdate, onCostUpdate, onPhaseChange }: DashboardSSEProps) {
+export function DashboardSSE() {
   const router = useRouter()
+  const { status } = useSession()
+  const [enabled, setEnabled] = useState(false)
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      setEnabled(true)
+    } else if (status === 'unauthenticated') {
+      setEnabled(false)
+    }
+  }, [status])
 
   useSSE({
     url: '/api/events',
-    enabled: true,
+    enabled,
     onMessage: (data: SSEMessage) => {
+      if (!data?.type) return
       if (data.type === 'heartbeat') return
 
       if (data.type === 'PROJECT_UPDATED' && data.projectId) {
-        onProjectUpdate?.(data.projectId)
+        router.refresh()
       } else if (data.type === 'COST_UPDATED' && data.projectId) {
-        onCostUpdate?.(data.projectId)
+        router.refresh()
       } else if (data.type === 'PROJECT_PHASE_CHANGED' && data.projectId) {
-        onPhaseChange?.(data.projectId, data.newPhase || '')
         router.refresh()
-      } else if (data.type === 'BUDGET_ALERT') {
-        router.refresh()
-      } else if (data.type === 'MILESTONE_DUE') {
+      } else if (data.type === 'BUDGET_ALERT' || data.type === 'MILESTONE_DUE') {
         router.refresh()
       }
     },

@@ -1,0 +1,779 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../src/generated/prisma"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id                 String          @id @default(cuid())
+  email              String          @unique
+  name               String?
+  password           String
+  role               String          @default("STAFF") // ADMIN, PM, STAFF
+  department         String?
+  position           String?
+  phone              String?
+  avatar             String?
+  isActive           Boolean         @default(true)
+  twoFactorEnabled   Boolean         @default(false)
+  twoFactorSecret    String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  projectMemberships ProjectMember[]
+  comments           Comment[]
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  timeSheets         TimeSheet[]
+  managedSales       Sales[]         @relation("SalesManager")
+  tasks              Task[]
+}
+
+model Customer {
+  id            String    @id @default(cuid())
+  name          String
+  code          String    @unique
+  industry      String?
+  contactPerson String?
+  contactPhone  String?
+  contactEmail  String?
+  address       String?
+  notes         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  projects      Project[]
+  sales         Sales[]
+}
+
+model Project {
+  id                 String               @id @default(cuid())
+  code               String               @unique
+  name               String
+  type               String?
+  status             String               @default("REGISTERED") // REGISTERED, CONTRACT, DESIGN, CONSTRUCTION, COMPLETED, CANCELLED
+  contractType       String?
+  startDate          DateTime?
+  endDate            DateTime?
+  contractDate       DateTime?
+  contractAmount     Float                @default(0)
+  estimatedBudget    Float                @default(0)
+  location           String?
+  address            String?
+  description        String?
+  isActive           Boolean              @default(true)
+  totalCashInflow    Float                @default(0)
+  totalCashOutflow   Float                @default(0)
+  currentCashBalance Float                @default(0)
+  budgetUsageRate    Float                @default(0)
+  costForecastRate   Float                @default(0)
+  costAdminRate      Float                @default(0)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  customerId         String?
+  customer           Customer?            @relation(fields: [customerId], references: [id])
+  members            ProjectMember[]
+  sales              Sales[]
+  budgets            Budget[]
+  wbsItems           WbsItem[]
+  progress           Progress[]
+  finance            Finance[]
+  documents          Document[]
+  tasks              Task[]
+  costEstimates      CostEstimate[]
+  costExecutions     CostExecution[]
+  costActuals        CostActual[]
+  workflow           ProjectWorkflow?
+  purchaseOrders     PurchaseOrder[]
+  cashFlows          CashFlow[]
+  monthlySnapshots   MonthlyCostSnapshot[]
+  dashboard          ProjectDashboard?
+}
+
+model ProjectMember {
+  id         String   @id @default(cuid())
+  role       String   @default("MEMBER") // PM, LEADER, MEMBER
+  allocation Float    @default(100)
+  isActive   Boolean  @default(true)
+  joinedAt   DateTime @default(now())
+  projectId  String
+  userId     String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model Sales {
+  id              String    @id @default(cuid())
+  type            String    @default("BIDDING") // BIDDING, CONTRACT, CHANGE_ORDER
+  status          String    @default("DRAFT") // DRAFT, SUBMITTED, EVALUATING, WON, LOST, CANCELLED
+  title           String
+  bidNumber       String?
+  bidAmount       Float     @default(0)
+  winProbability  Float?
+  bidOpenDate     DateTime?
+  submissionDate  DateTime?
+  contractDate    DateTime?
+  contractAmount  Float     @default(0)
+  customerBudget  Float?
+  competitorInfo  String?
+  laborCost       Float     @default(0)
+  materialCost    Float     @default(0)
+  outsourceCost   Float     @default(0)
+  equipmentCost   Float     @default(0)
+  otherCost       Float     @default(0)
+  executionCost   Float     @default(0)
+  bidResult       String?
+  resultDate      DateTime?
+  description     String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id])
+  projectId       String?
+  project         Project?  @relation(fields: [projectId], references: [id])
+  managerId       String?
+  manager         User?     @relation("SalesManager", fields: [managerId], references: [id])
+  budgets         Budget[]
+}
+
+model Budget {
+  id                  String       @id @default(cuid())
+  type                String       @default("INITIAL") // INITIAL, REVISED, FINAL
+  sourceType          String?
+  sourceSalesId       String?
+  totalBudget         Float        @default(0)
+  laborCost           Float        @default(0)
+  materialCost        Float        @default(0)
+  outsourceCost       Float        @default(0)
+  equipmentCost       Float        @default(0)
+  otherCost           Float        @default(0)
+  actualCost          Float        @default(0)
+  committedCost       Float        @default(0)
+  indirectCostRate    Float        @default(0)
+  sellingAdminCostRate Float        @default(0)
+  profitMargin        Float        @default(0)
+  targetProfit        Float        @default(0)
+  estimatedProfit     Float        @default(0)
+  currentProfit       Float        @default(0)
+  status              String       @default("DRAFT") // DRAFT, APPROVED, IN_PROGRESS, CLOSED
+  effectiveDate       DateTime?
+  notes               String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  projectId           String
+  project             Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  salesId             String?
+  sales               Sales?       @relation(fields: [salesId], references: [id])
+  items               BudgetItem[]
+}
+
+model BudgetItem {
+  id             String   @id @default(cuid())
+  wbsCode        String?
+  name           String
+  category       String?
+  plannedAmount  Float    @default(0)
+  previousAmount Float    @default(0)
+  currentAmount  Float    @default(0)
+  actualAmount   Float    @default(0)
+  sortOrder      Int      @default(0)
+  description    String?
+  budgetId       String
+  budget         Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model WbsItem {
+  id               String          @id @default(cuid())
+  code             String
+  name             String
+  description      String?
+  startDate        DateTime?
+  endDate          DateTime?
+  plannedDays      Int?
+  progress         Int             @default(0)
+  plannedCost      Float           @default(0)
+  actualCost       Float           @default(0)
+  sortOrder        Int             @default(0)
+  parentId         String?
+  status           String          @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, DELAYED
+  phaseType        String?
+  isMilestone      Boolean         @default(false)
+  milestoneType    String?
+  isProcurement    Boolean         @default(false)
+  assignedVendorId String?
+  projectId        String
+  project          Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent           WbsItem?        @relation("WbsHierarchy", fields: [parentId], references: [id])
+  children         WbsItem[]       @relation("WbsHierarchy")
+  purchaseOrders   PurchaseOrder[]
+  progressRecords  Progress[]
+  tasks            Task[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model Progress {
+  id              String       @id @default(cuid())
+  date            DateTime
+  plannedProgress Float        @default(0)
+  actualProgress  Float        @default(0)
+  status          String       @default("NORMAL") // NORMAL, DELAYED, AHEAD
+  description     String?
+  issues          String?
+  projectId       String
+  project         Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wbsItemId       String?
+  wbsItem         WbsItem?     @relation(fields: [wbsItemId], references: [id])
+  attachments     Attachment[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Resource {
+  id             String      @id @default(cuid())
+  name           String
+  employeeNumber String      @unique
+  department     String?
+  position       String?
+  grade          String?
+  skills         String?
+  certifications String?
+  hourlyRate     Float       @default(0)
+  monthlyRate    Float       @default(0)
+  availability   Float       @default(100)
+  phone          String?
+  email          String?
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  timeSheets     TimeSheet[]
+}
+
+model TimeSheet {
+  id          String    @id @default(cuid())
+  date        DateTime
+  hours       Float     @default(0)
+  workType    String?
+  description String?
+  status      String    @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, REJECTED
+  hourlyRate  Float     @default(0)
+  totalCost   Float     @default(0)
+  approvedBy  String?
+  approvedAt  DateTime?
+  projectId   String
+  userId      String
+  resourceId  String?
+  user        User      @relation(fields: [userId], references: [id])
+  resource    Resource? @relation(fields: [resourceId], references: [id])
+
+  @@unique([userId, projectId, date])
+}
+
+model Finance {
+  id              String   @id @default(cuid())
+  type            String   @default("REVENUE") // REVENUE, COST
+  category        String?
+  amount          Float    @default(0)
+  occurDate       DateTime
+  billingDate     DateTime?
+  paymentDate     DateTime?
+  status          String   @default("PENDING") // PENDING, CONFIRMED, PAID, CANCELLED
+  description     String?
+  referenceNumber String?
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("TODO") // TODO, IN_PROGRESS, REVIEW, DONE
+  priority    String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate     DateTime?
+  completedAt DateTime?
+  assigneeId  String?
+  projectId   String
+  wbsItemId   String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wbsItem     WbsItem?  @relation(fields: [wbsItemId], references: [id])
+  assignee    User?     @relation(fields: [assigneeId], references: [id])
+  comments    Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  title       String
+  type        String? // CONTRACT, DRAWING, REPORT, MANUAL, ETC
+  fileName    String?
+  fileUrl     String?
+  fileSize    Int?
+  mimeType    String?
+  version     String?
+  isActive    Boolean  @default(true)
+  description String?
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  fileName    String
+  fileUrl     String
+  fileSize    Int?
+  mimeType    String?
+  description String?
+  progressId  String
+  progress    Progress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  changes    String?
+  ipAddress  String?
+  userAgent  String?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  type      String
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+}
+
+model CostCategory {
+  id             String               @id @default(cuid())
+  code           String               @unique
+  name           String
+  nameEn         String?
+  type           String?
+  level          Int                  @default(1)
+  parentId       String?
+  isActive       Boolean              @default(true)
+  isDefault      Boolean              @default(false)
+  defaultRate    Float                @default(0)
+  description    String?
+  sortOrder      Int                  @default(0)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  parent         CostCategory?        @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children       CostCategory[]       @relation("CategoryHierarchy")
+  estimateItems  CostEstimateItem[]
+  executionItems CostExecutionItem[]
+  actualItems    CostActualItem[]
+}
+
+model CostEstimate {
+  id                      String             @id @default(cuid())
+  projectId               String
+  title                   String
+  version                 String             @default("1.0")
+  status                  String             @default("DRAFT")
+  contractAmount          Float              @default(0)
+  materialCost            Float              @default(0)
+  laborCost               Float              @default(0)
+  outsourceFabrication    Float              @default(0)
+  outsourceService        Float              @default(0)
+  consumableOther         Float              @default(0)
+  consumableSafety        Float              @default(0)
+  travelExpense           Float              @default(0)
+  insuranceWarranty       Float              @default(0)
+  dormitoryCost           Float              @default(0)
+  miscellaneous           Float              @default(0)
+  paymentFeeOther         Float              @default(0)
+  rentalForklift          Float              @default(0)
+  rentalOther             Float              @default(0)
+  vehicleRepair           Float              @default(0)
+  vehicleFuel             Float              @default(0)
+  vehicleOther            Float              @default(0)
+  welfareBusiness         Float              @default(0)
+  reserveFund             Float              @default(0)
+  indirectCost            Float              @default(0)
+  totalExpense            Float              @default(0)
+  totalDirectCost         Float              @default(0)
+  totalManufacturingCost  Float              @default(0)
+  sellingAdminRate        Float              @default(0)
+  sellingAdminCost        Float              @default(0)
+  grossProfit             Float              @default(0)
+  operatingProfit         Float              @default(0)
+  profitRate              Float              @default(0)
+  notes                   String?
+  estimatedDate           DateTime?
+  validUntil              DateTime?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  project                 Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items                   CostEstimateItem[]
+  executions              CostExecution[]
+}
+
+model CostEstimateItem {
+  id             String        @id @default(cuid())
+  costEstimateId String
+  categoryId     String?
+  categoryType   String?
+  subCategory    String?
+  itemName       String
+  specification  String?
+  unit           String?
+  quantity       Float         @default(0)
+  unitPrice      Float         @default(0)
+  amount         Float         @default(0)
+  sortOrder      Int           @default(0)
+  description    String?
+  vendor         String?
+  remarks        String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  costEstimate   CostEstimate  @relation(fields: [costEstimateId], references: [id], onDelete: Cascade)
+  costCategory   CostCategory? @relation(fields: [categoryId], references: [id])
+}
+
+model CostExecution {
+  id                      String              @id @default(cuid())
+  projectId               String
+  costEstimateId          String?
+  type                    String?
+  periodYear              Int
+  periodMonth             Int
+  status                  String              @default("DRAFT")
+  materialCost            Float               @default(0)
+  laborCost               Float               @default(0)
+  outsourceFabrication    Float               @default(0)
+  outsourceService        Float               @default(0)
+  consumableOther         Float               @default(0)
+  consumableSafety        Float               @default(0)
+  travelExpense           Float               @default(0)
+  insuranceWarranty       Float               @default(0)
+  dormitoryCost           Float               @default(0)
+  miscellaneous           Float               @default(0)
+  paymentFeeOther         Float               @default(0)
+  rentalForklift          Float               @default(0)
+  rentalOther             Float               @default(0)
+  vehicleRepair           Float               @default(0)
+  vehicleFuel             Float               @default(0)
+  vehicleOther            Float               @default(0)
+  welfareBusiness         Float               @default(0)
+  reserveFund             Float               @default(0)
+  indirectCost            Float               @default(0)
+  totalExpense            Float               @default(0)
+  totalDirectCost         Float               @default(0)
+  totalManufacturingCost  Float               @default(0)
+  sellingAdminRate        Float               @default(0)
+  sellingAdminCost        Float               @default(0)
+  grossProfit             Float               @default(0)
+  operatingProfit         Float               @default(0)
+  contractAmount          Float               @default(0)
+  description             String?
+  recordedDate            DateTime?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  project                 Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  costEstimate            CostEstimate?       @relation(fields: [costEstimateId], references: [id])
+  items                   CostExecutionItem[]
+}
+
+model CostExecutionItem {
+  id              String         @id @default(cuid())
+  costExecutionId String
+  categoryId      String?
+  categoryType    String?
+  subCategory     String?
+  itemName        String
+  specification   String?
+  unit            String?
+  quantity        Float          @default(0)
+  unitPrice       Float          @default(0)
+  amount          Float          @default(0)
+  adjustmentType  String?
+  occurDate       DateTime?
+  description     String?
+  vendor          String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  costExecution   CostExecution  @relation(fields: [costExecutionId], references: [id], onDelete: Cascade)
+  costCategory    CostCategory?  @relation(fields: [categoryId], references: [id])
+}
+
+model CostActual {
+  id                      String           @id @default(cuid())
+  projectId               String
+  type                    String?
+  asOfDate                DateTime
+  contractAmount          Float            @default(0)
+  materialCost            Float            @default(0)
+  laborCost               Float            @default(0)
+  outsourceFabrication    Float            @default(0)
+  outsourceService        Float            @default(0)
+  consumableOther         Float            @default(0)
+  consumableSafety        Float            @default(0)
+  travelExpense           Float            @default(0)
+  insuranceWarranty       Float            @default(0)
+  dormitoryCost           Float            @default(0)
+  miscellaneous           Float            @default(0)
+  paymentFeeOther         Float            @default(0)
+  rentalForklift          Float            @default(0)
+  rentalOther             Float            @default(0)
+  vehicleRepair           Float            @default(0)
+  vehicleFuel             Float            @default(0)
+  vehicleOther            Float            @default(0)
+  welfareBusiness         Float            @default(0)
+  reserveFund             Float            @default(0)
+  indirectCost            Float            @default(0)
+  totalExpense            Float            @default(0)
+  totalDirectCost         Float            @default(0)
+  totalManufacturingCost  Float            @default(0)
+  sellingAdminRate        Float            @default(0)
+  sellingAdminCost        Float            @default(0)
+  grossProfit             Float            @default(0)
+  operatingProfit         Float            @default(0)
+  profitRate              Float            @default(0)
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+  project                 Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items                   CostActualItem[]
+  materialReceipts        MaterialReceipt[]
+}
+
+model CostActualItem {
+  id           String        @id @default(cuid())
+  costActualId String
+  categoryId   String?
+  categoryType String?
+  subCategory  String?
+  costType     String?
+  amount       Float         @default(0)
+  description  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  costActual   CostActual    @relation(fields: [costActualId], references: [id], onDelete: Cascade)
+  costCategory CostCategory? @relation(fields: [categoryId], references: [id])
+}
+
+model ProjectWorkflow {
+  id                     String    @id @default(cuid())
+  projectId              String    @unique
+  currentPhase           String    @default("BIDDING") // BIDDING, CONTRACT, DESIGN, PROCUREMENT, CONSTRUCTION, COMPLETED
+  salesId                String?
+  activeCostEstimateId   String?
+  activeCostExecutionId  String?
+  latestCostActualId     String?
+  currentPhaseStart      DateTime?
+  currentPhaseEnd        DateTime?
+  status                 String    @default("NORMAL")
+  notes                  String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  project                Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Vendor {
+  id             String          @id @default(cuid())
+  name           String
+  code           String          @unique
+  category       String? // MATERIAL, EQUIPMENT, SERVICE, LABOR
+  businessNumber String?
+  contactPerson  String?
+  contactPhone   String?
+  contactEmail   String?
+  address        String?
+  bankName       String?
+  accountNumber  String?
+  accountHolder  String?
+  isActive       Boolean         @default(true)
+  description    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  orders         PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id               String              @id @default(cuid())
+  orderNumber      String              @unique
+  projectId        String
+  wbsItemId        String?
+  vendorId         String
+  title            String
+  description      String?
+  orderDate        DateTime
+  requiredDate     DateTime?
+  deliveryDate     DateTime?
+  subtotal         Float               @default(0)
+  tax              Float               @default(0)
+  totalAmount      Float               @default(0)
+  paidAmount       Float               @default(0)
+  status           String              @default("DRAFT") // DRAFT, SENT, PARTIAL, RECEIVED, INSTALLED, CANCELLED
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  project          Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wbsItem          WbsItem?            @relation(fields: [wbsItemId], references: [id])
+  vendor           Vendor              @relation(fields: [vendorId], references: [id])
+  items            PurchaseOrderItem[]
+  materialReceipts MaterialReceipt[]
+
+  @@index([projectId])
+  @@index([vendorId])
+  @@index([status])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  itemName        String
+  specification   String?
+  unit            String?
+  quantity        Float         @default(0)
+  unitPrice       Float         @default(0)
+  amount          Float         @default(0)
+  orderedQuantity Float         @default(0)
+  receivedQuantity Float        @default(0)
+  rejectedQuantity Float        @default(0)
+  status          String?
+  remarks         String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+}
+
+model MaterialReceipt {
+  id              String        @id @default(cuid())
+  receiptNumber   String        @unique
+  purchaseOrderId String
+  receiptDate     DateTime
+  receivedBy      String?
+  itemsJson       String?
+  subtotal        Float         @default(0)
+  tax             Float         @default(0)
+  totalAmount     Float         @default(0)
+  status          String        @default("COMPLETE") // PARTIAL, COMPLETE
+  notes           String?
+  costActualId    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  costActual      CostActual?   @relation(fields: [costActualId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([receiptDate])
+}
+
+model CashFlow {
+  id            String   @id @default(cuid())
+  projectId     String
+  type          String   @default("OUTFLOW") // INFLOW, OUTFLOW
+  category      String?
+  plannedAmount Float    @default(0)
+  actualAmount  Float    @default(0)
+  plannedDate   DateTime
+  actualDate    DateTime?
+  status        String   @default("PLANNED") // PLANNED, COMMITTED, ACTUAL, CANCELLED
+  referenceType String?
+  referenceId   String?
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([type])
+  @@index([status])
+  @@index([plannedDate])
+}
+
+model MonthlyCostSnapshot {
+  id                     String   @id @default(cuid())
+  projectId              String
+  year                   Int
+  month                  Int
+  contractAmount         Float    @default(0)
+  materialCost           Float    @default(0)
+  laborCost              Float    @default(0)
+  outsourceCost          Float    @default(0)
+  equipmentCost          Float    @default(0)
+  otherCost              Float    @default(0)
+  totalCost              Float    @default(0)
+  indirectCost           Float    @default(0)
+  sellingAdminCost       Float    @default(0)
+  grossProfit            Float    @default(0)
+  operatingProfit        Float    @default(0)
+  profitRate             Float    @default(0)
+  isActual               Boolean  @default(false)
+  notes                  String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  project                Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, year, month, isActual])
+  @@index([projectId])
+}
+
+model ProjectDashboard {
+  id                 String   @id @default(cuid())
+  projectId          String   @unique
+  pv                 Float    @default(0)
+  ev                 Float    @default(0)
+  ac                 Float    @default(0)
+  bac                Float    @default(0)
+  cpi                Float    @default(0)
+  spi                Float    @default(0)
+  eac                Float    @default(0)
+  vac                Float    @default(0)
+  progress           Float    @default(0)
+  budgetUsageRate    Float    @default(0)
+  contractAmount     Float    @default(0)
+  totalCost          Float    @default(0)
+  grossProfit        Float    @default(0)
+  operatingProfit    Float    @default(0)
+  profitRate         Float    @default(0)
+  totalCashInflow    Float    @default(0)
+  totalCashOutflow   Float    @default(0)
+  currentCashBalance Float    @default(0)
+  isOnSchedule       Boolean  @default(true)
+  isOnBudget         Boolean  @default(true)
+  updatedAt          DateTime @updatedAt
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}

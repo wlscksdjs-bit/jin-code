@@ -138,6 +138,7 @@ model Project {
   purchaseOrders  PurchaseOrder[]
   cashFlows       CashFlow[]
   monthlySnapshots MonthlyCostSnapshot[]
+  dashboard       ProjectDashboard?
 }
 
 model ProjectMember {
@@ -921,6 +922,7 @@ model CostActual {
   updatedAt       DateTime @updatedAt
   
   items          CostActualItem[]
+  materialReceipts MaterialReceipt[]
 }
 
 model CostActualItem {
@@ -1058,6 +1060,7 @@ model PurchaseOrder {
   // Relations
   project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   items           PurchaseOrderItem[]
+  materialReceipts MaterialReceipt[]
   
   @@index([projectId])
   @@index([vendorId])
@@ -1094,6 +1097,47 @@ model PurchaseOrderItem {
   updatedAt           DateTime  @updatedAt
   
   @@index([purchaseOrderId])
+}
+
+// ============================================
+// 17-1. 자재 입고 관리 (Material Receipt) - PMS 2.0
+// ============================================
+
+model MaterialReceipt {
+  id              String    @id @default(cuid())
+  receiptNumber   String    @unique // MR-2026-0001
+  
+  // PurchaseOrder 연동
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  
+  // 입고 정보
+  receiptDate     DateTime  @default(now())
+  receivedBy      String?   // 입고 담당자
+  
+  // 품목별 입고 수량 (JSON: [{itemId, itemName, specification, unit, quantity, unitPrice, amount}])
+  itemsJson       String?   // 입고 품목 상세 (JSON)
+  
+  // 금액
+  subtotal        Float     @default(0)
+  tax             Float     @default(0)
+  totalAmount     Float     @default(0)
+  
+  // 상태: PARTIAL → COMPLETE
+  status          String    @default("PARTIAL")
+  
+  // 입고 메모
+  notes           String?
+  
+  // 연동된 CostActual
+  costActualId    String?
+  costActual      CostActual? @relation(fields: [costActualId], references: [id])
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([purchaseOrderId])
+  @@index([receiptDate])
 }
 
 // ============================================
@@ -1185,5 +1229,55 @@ model MonthlyCostSnapshot {
   project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
   @@unique([projectId, year, month, isActual])
+  @@index([projectId])
+}
+
+// ============================================
+// 20. Dashboard KPI 집계 캐시 (ProjectDashboard) - PMS 2.0
+// ============================================
+
+model ProjectDashboard {
+  id              String    @id @default(cuid())
+  projectId       String    @unique
+  
+  // Earned Value Management
+  pv              Float     @default(0)  // Planned Value (계획 가치)
+  ev              Float     @default(0)  // Earned Value (실행 가치)
+  ac              Float     @default(0)  // Actual Cost (실제 비용)
+  bac             Float     @default(0)  // Budget at Completion
+  
+  // KPI Ratios
+  cpi             Float     @default(1)  // Cost Performance Index
+  spi             Float     @default(1)  // Schedule Performance Index
+  
+  // Forecast
+  eac             Float     @default(0)  // Estimate at Completion
+  vac             Float     @default(0)  // Variance at Completion
+  
+  // Progress
+  progress        Float     @default(0)  // 진도율 (%)
+  budgetUsageRate  Float     @default(0)  // 예산 사용률
+  
+  // Profit/Loss (current snapshot)
+  contractAmount  Float     @default(0)
+  totalCost       Float     @default(0)
+  grossProfit     Float     @default(0)
+  operatingProfit Float     @default(0)
+  profitRate      Float     @default(0)
+  
+  // Cash flow
+  totalCashInflow    Float   @default(0)
+  totalCashOutflow   Float   @default(0)
+  currentCashBalance Float   @default(0)
+  
+  // Status flags
+  isOnSchedule    Boolean   @default(true)
+  isOnBudget      Boolean   @default(true)
+  
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
   @@index([projectId])
 }

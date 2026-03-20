@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { calculateProfit } from '@/lib/cost-calculation'
 import { checkBudgetOverrun } from './alerts'
-import { broadcast } from '@/lib/sse-broadcast'
+import { invalidateDashboard } from './dashboard'
 
 export interface CreateCostExecutionInput {
   projectId: string
@@ -162,13 +162,7 @@ export async function createCostExecution(input: CreateCostExecutionInput) {
     })
 
     await checkBudgetOverrun(input.projectId, session.user.id)
-
-    broadcast('global', {
-      type: 'COST_UPDATED',
-      projectId: input.projectId,
-      periodYear: input.periodYear,
-      periodMonth: input.periodMonth,
-    })
+    await invalidateDashboard(input.projectId)
 
     revalidatePath('/cost')
     revalidatePath(`/projects/${input.projectId}`)
