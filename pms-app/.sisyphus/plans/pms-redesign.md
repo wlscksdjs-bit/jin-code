@@ -118,25 +118,25 @@ Wave 2 (원가 핵심 - Wave 1 완료 후):
 └── Task 12: 실행원가 모델 + API
 
 Wave 3 (실행원가 + 실적 - 병렬):
-├── Task 13: 실행원가 등록 UI
-├── Task 14: 월별 실적 모델 + API
-├── Task 15: 월별 실적 UI (누적 표시)
-├── Task 16: SSE 실시간推送 설정
-└── Task 17: Dashboard 집계 테이블
+├── Task 13: 실행원가 등록 UI ✅
+├── Task 14: 월별 실적 모델 + API ✅
+├── Task 15: 월별 실적 UI (누적 표시) ✅
+├── Task 16: SSE 실시간推送 설정 ✅
+└── Task 17: Dashboard 집계 테이블 ✅ (2026-03-20)
 
 Wave 4 (일정/구매 - 병렬):
-├── Task 18: WBS 모델 + API
-├── Task 19: CPM 일정 계산
-├── Task 20: 간트차트 연동
-├── Task 21: 발주 모델 + API
-└── Task 22: 입고 모델 + API
+├── Task 18: WBS 모델 + API ✅
+├── Task 19: CPM 일정 계산 ✅
+├── Task 20: 간트차트 연동 ✅
+├── Task 21: 발주 모델 + API ✅
+└── Task 22: 입고 모델 + API ✅ (2026-03-20)
 
 Wave 5 (재무/대시보드 - 병렬):
-├── Task 23: 자금수지 모델 + API
-├── Task 24: 자금수지 실시간 UI
-├── Task 25: 대시보드 메인 페이지
-├── Task 26: 수주영업 현황
-└── Task 27: KPI 카드 (CPI/SPI/EAC)
+├── Task 23: 자금수지 모델 + API ✅
+├── Task 24: 자금수지 실시간 UI ✅
+├── Task 25: 대시보드 메인 페이지 ✅
+├── Task 26: 수주영업 현황 ✅
+└── Task 27: KPI 카드 (CPI/SPI/EAC) ✅
 
 Wave FINAL (통합 + 검증):
 ├── Task F1: 전체 연동 검증
@@ -145,6 +145,16 @@ Wave FINAL (통합 + 검증):
 └── Task F4: 문서화
 
 Critical Path: Task 1 → 2 → 7 → 8 → 12 → 13 → 14 → 15 → 17 → 23 → 25 → F1
+
+### Implementation Status (2026-03-20)
+- **Wave 1** (Foundation): ✅ DONE — ProjectWorkflow, confirmContract, Server Actions, UI, RBAC, Layout
+- **Wave 2** (원가핵심): ✅ DONE — Project CRUD, CostEstimate API, Budget API, CostExecution API
+- **Wave 3** (실행원가+실적): ✅ DONE — MonthlyCostSnapshot, SSE infra, KPI 계산
+- **Wave 4** (일정/구매): ✅ DONE — WbsItem, CPM 계산, GanttChart, PurchaseOrder, Vendor CRUD
+- **Wave 5** (재무/대시보드): ✅ DONE — CashFlow API, CashFlowChart, KPI 카드, Dashboard 연동
+- **Tasks 17, 22** (MISSING → DONE 2026-03-20): MaterialReceipt 모델 + 입고→CostActual 자동 생성, ProjectDashboard KPI 집계 테이블
+- **Final** (E2E): ⚠️ 코드 작성 완료, 환경 제약(Playwright browser deps 미설치)으로 미실행
+- **PostgreSQL**: ⚠️ Phase 1 스킵 — local 미설치, SQLite 유지 중
 ```
 
 ### Dependency Matrix
@@ -1016,11 +1026,12 @@ Critical Path: Task 1 → 2 → 7 → 8 → 12 → 13 → 14 → 15 → 17 → 2
   - 기존 profit-loss.ts
 
   **Acceptance Criteria**:
-  - [ ] ProjectDashboard 테이블 생성
-  - [ ] CPI 계산 (EV/AC)
-  - [ ] SPI 계산 (EV/PV)
-  - [ ] EAC, VAC 계산
-  - [ ] 변경 시 자동 갱신
+  - [x] ProjectDashboard 테이블 생성 (prisma/schema.prisma)
+  - [x] CPI 계산 (EV/AC) (src/lib/kpi.ts)
+  - [x] SPI 계산 (EV/PV) (src/lib/kpi.ts)
+  - [x] EAC, VAC 계산 (src/lib/kpi.ts)
+  - [x] 변경 시 자동 갱신 (src/app/actions/dashboard.ts: invalidateDashboard)
+  - **Status**: DONE (2026-03-20)
 
   **QA Scenarios**:
   ```
@@ -1266,10 +1277,11 @@ Critical Path: Task 1 → 2 → 7 → 8 → 12 → 13 → 14 → 15 → 17 → 2
   - 기존 MaterialReceipt 모델
 
   **Acceptance Criteria**:
-  - [ ] 입고 등록
-  - [ ] 발주 잔량 표시
-  - [ ] 입고 → CostActual 자동 생성
-  - [ ] 검수 상태 관리
+  - [x] 입고 등록 (MaterialReceipt 모델: prisma/schema.prisma)
+  - [x] 발주 잔량 표시 (PurchaseOrderItem.receivedQuantity)
+  - [x] 입고 → CostActual 자동 생성 (src/app/actions/purchase-orders.ts: receivePurchaseOrder)
+  - [x] 검수 상태 관리 (PARTIAL/COMPLETE via receivedQuantity)
+  - **Status**: DONE (2026-03-20)
 
   **QA Scenarios**:
   ```

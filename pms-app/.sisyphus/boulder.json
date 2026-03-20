@@ -1,7 +1,10 @@
 {
-  "active_plan": "C:\\Users\\JIN\\PycharmProjects\\jin-code\\pms-app\\.sisyphus\\plans\\hanja-to-hangul.md",
-  "started_at": "2026-03-17T04:09:41.898Z",
-  "session_ids": ["ses_30603c93dfferWuCarzSioBTaL"],
-  "plan_name": "hanja-to-hangul",
-  "worktree_path": "C:\\Users\\JIN\\PycharmProjects\\jin-code\\pms-app"
+  "active_plan": "/mnt/c/Users/JIN/PycharmProjects/jin-code/pms-app/.sisyphus/plans/pms-redesign.md",
+  "started_at": "2026-03-20T12:14:12.117Z",
+  "session_ids": [
+    "ses_2fe8850f6ffeiDqGfKzMPwBrZR",
+    "ses_2f4c7d07effeRLb1iKegYZqbfL"
+  ],
+  "plan_name": "pms-redesign",
+  "agent": "atlas"
 }

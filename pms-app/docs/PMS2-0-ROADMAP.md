@@ -34,28 +34,7 @@
 
 | 영역 | 상태 | 우선순위 |
 |------|------|----------|
-| 원가 3단계 추적 | ✅ 구현 완료 (CostEstimate/Execution/Actual) | - |
-| 간트차트 컴포넌트 | ✅ 구현 완료 (GanttChart + GanttChartUpdater) | - |
 | 손익 계산 유틸 | ✅ 구현 완료 | - |
-| 수주→설계 워크플로우 | ✅ 구현 완료 (confirmContract, transitionPhase) | - |
-| 간트차트 저장 | ✅ 구현 완료 (GanttChartUpdater → updateWbsItem) | - |
-| 구매/발주 관리 | ✅ 구현 완료 (Vendor CRUD, PurchaseOrder CRUD) | - |
-| Dashboard 연동 | ✅ 구현 완료 (SalesPipeline, ProjectProfitability, CashFlow) | - |
-| Sales Pipeline | ✅ 구현 완료 (Dashboard + Sales 목록) | - |
-| Cash Flow | ✅ 구현 완료 (cash-flow.ts, CashFlowChart, 프로젝트별) | - |
-| 월별 원가 입력 | ✅ 구현 완료 (MonthlyCostForm, /cost/monthly) | - |
-| 예산 초과 알림 | ✅ 구현 완료 (80/90/100% 임계값) | - |
-| 마일스톤 기한 알림 | ✅ 구현 완료 (7일 이내) | - |
-| 알림 읽음 처리 | ✅ 구현 완료 (개별 + 일괄) | - |
-| Excel 내보내기 | ✅ 구현 완료 (Projects, Orders, CostExecutions) | - |
-| 인쇄/Export 기능 | ✅ 구현 완료 (Browser Print + Excel) | - |
-| 인쇄 버튼 | ✅ 구현 완료 (프로젝트 상세페이지) | - |
-| 성능 최적화 | ⚠️ 미검증 (프로덕션 필요) | 🟡 중간 |
-| 테스트 (E2E) | ✅ 구현 완료 (Playwright, 4개 페이지) | - |
-| README 문서화 | ✅ 구현 완료 | - |
-
-> **전체 Phase 1-5 구현 완료 (2026-03-19)**
-> 모든 코어 기능 구현. 성능 최적화는 프로덕션 환경에서 검증 필요.
 
 ---
 
@@ -1332,5 +1311,3 @@ Week 9-10:  Phase 5 배포 → 통합 테스트
 ---
 
 *문서 생성일: 2026-03-19*
-*최종 업데이트: 2026-03-19*
-*버전: 2.0 - 구현 완료*

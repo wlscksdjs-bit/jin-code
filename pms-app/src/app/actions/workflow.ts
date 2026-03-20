@@ -3,7 +3,6 @@
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { broadcast } from '@/lib/sse-broadcast'
 
 // Phase 순서 정의
 const PHASE_ORDER = ['BIDDING', 'CONTRACT', 'DESIGN', 'PROCUREMENT', 'CONSTRUCTION', 'COMPLETED']
@@ -179,16 +178,6 @@ export async function confirmContract(
   revalidatePath('/projects')
   if (projectId) {
     revalidatePath(`/projects/${projectId}`)
-    broadcast('global', { type: 'PROJECT_UPDATED', projectId })
-  }
-
-  return {
-    success: true,
-    salesId,
-    projectId: projectId ?? undefined,
-    workflowId,
-    milestonesCreated,
-    message: `수주가 확정되었습니다.${milestonesCreated > 0 ? ` ${milestonesCreated}개의 마일스톤이 생성되었습니다.` : ''}`,
   }
 
   return {
@@ -309,8 +298,6 @@ export async function transitionPhase(
 
   revalidatePath(`/projects/${projectId}`)
   revalidatePath('/projects')
-
-  broadcast('global', { type: 'PROJECT_PHASE_CHANGED', projectId, previousPhase: currentPhase, newPhase })
 
   return {
     success: true,
