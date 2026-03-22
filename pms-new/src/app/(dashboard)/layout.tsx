@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 
 const navItems = [
-  { href: '/', label: '대시보드', icon: LayoutDashboard },
+  { href: '/dashboard-page', label: '대시보드', icon: LayoutDashboard },
   { href: '/projects', label: '프로젝트', icon: FolderKanban },
   { href: '/sales', label: '영업수주', icon: TrendingUp },
   { href: '/cost', label: '원가관리', icon: DollarSign },
