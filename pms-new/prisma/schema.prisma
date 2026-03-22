@@ -386,6 +386,7 @@ model CostCategory {
   name           String
   nameEn         String?
   type           String?
+  costType       String               @default("DIRECT") // "DIRECT" or "INDIRECT"
   level          Int                  @default(1)
   parentId       String?
   isActive       Boolean              @default(true)
