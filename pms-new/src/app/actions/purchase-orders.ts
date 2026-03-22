@@ -161,3 +161,4 @@ export async function listVendors() {
   if (!session) throw new Error('Unauthorized')
   return prisma.vendor.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } })
 }
+export async function listPurchaseOrderItems() { return []; }

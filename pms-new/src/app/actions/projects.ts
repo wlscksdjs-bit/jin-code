@@ -140,3 +140,6 @@ export async function listCustomers() {
     orderBy: { name: 'asc' },
   })
 }
+
+export async function getCostEstimate(projectId: string) { return null; }
+export async function getCostExecution(projectId: string) { return []; }
