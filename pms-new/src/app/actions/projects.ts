@@ -141,5 +141,6 @@ export async function listCustomers() {
   })
 }
 
-export async function getCostEstimate(projectId: string) { return null; }
+export async function getCostEstimate(projectId: string) { return []; }
 export async function getCostExecution(projectId: string) { return []; }
+
