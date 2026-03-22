@@ -1,5 +1,3 @@
-'use server'
-
 import { redirect } from 'next/navigation'
 import { notFound } from 'next/navigation'
 import { getProject } from '@/app/actions/projects'
