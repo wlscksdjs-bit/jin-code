@@ -1,10 +1,15 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
 import { listCustomers } from '@/app/actions/projects'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createProjectAction } from './actions'
 
 export default async function NewProjectPage() {
+  const session = await auth()
+  if (!session) redirect('/signin')
+  
   const customers = await listCustomers()
 
   return (

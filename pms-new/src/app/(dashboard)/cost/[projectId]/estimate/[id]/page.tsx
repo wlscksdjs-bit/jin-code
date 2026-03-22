@@ -1,11 +1,11 @@
 'use client'
 import { notFound } from 'next/navigation'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { getCostEstimate, deleteCostEstimate } from '@/app/actions/cost-estimates'
+import { auth } from '@/lib/auth'
+import { getCostEstimate } from '@/app/actions/cost-estimates'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { deleteCostEstimateAction } from './actions'
 
 const COST_ROWS = [
   { key: 'materialCost', label: '재료비' },
@@ -34,17 +34,14 @@ export default async function CostEstimateDetailPage({
 }: {
   params: Promise<{ projectId: string; id: string }>
 }) {
+  const session = await auth()
+  if (!session) return null
+
   const { projectId, id } = await params
   const estimate = await getCostEstimate(id)
   if (!estimate) notFound()
 
   const fmt = (n: number) => `${n.toLocaleString('ko-KR')}원`
-
-  async function handleDelete() {
-    'use server'
-    await deleteCostEstimate(id)
-    redirect(`/projects/${projectId}`)
-  }
 
   return (
     <div className="space-y-6">
@@ -60,7 +57,7 @@ export default async function CostEstimateDetailPage({
         </div>
         <div className="flex gap-2">
           <Link href={`/cost/${projectId}/estimate/${id}`}><Button>편집</Button></Link>
-          <form action={handleDelete}>
+          <form action={deleteCostEstimateAction.bind(null, id, projectId)}>
             <Button type="submit" variant="destructive">삭제</Button>
           </form>
         </div>

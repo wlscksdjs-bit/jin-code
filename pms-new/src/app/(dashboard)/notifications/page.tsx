@@ -218,16 +218,11 @@ export default function NotificationsPage() {
                       </Button>
                     )}
                     {notification.link && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        asChild
-                      >
-                        <a href={notification.link} target="_blank" rel="noopener noreferrer">
+                      <a href={notification.link} target="_blank" rel="noopener noreferrer">
+                        <Button size="icon" className="h-8 w-8">
                           <ExternalLink className="h-4 w-4" />
-                        </a>
-                      </Button>
+                        </Button>
+                      </a>
                     )}
                     <Button
                       variant="ghost"

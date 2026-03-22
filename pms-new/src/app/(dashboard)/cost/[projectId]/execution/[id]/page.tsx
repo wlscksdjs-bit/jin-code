@@ -1,10 +1,11 @@
 'use client'
 import { notFound } from 'next/navigation'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { getCostExecution, deleteCostExecution } from '@/app/actions/cost-executions'
+import { auth } from '@/lib/auth'
+import { getCostExecution } from '@/app/actions/cost-executions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { deleteCostExecutionAction } from './actions'
 
 const COST_ROWS = [
   { key: 'materialCost', label: '재료비' },
@@ -33,17 +34,14 @@ export default async function CostExecutionDetailPage({
 }: {
   params: Promise<{ projectId: string; id: string }>
 }) {
+  const session = await auth()
+  if (!session) return null
+
   const { projectId, id } = await params
   const exec = await getCostExecution(id)
   if (!exec) notFound()
 
   const fmt = (n: number) => `${n.toLocaleString('ko-KR')}원`
-
-  async function handleDelete() {
-    'use server'
-    await deleteCostExecution(id)
-    redirect(`/projects/${projectId}`)
-  }
 
   return (
     <div className="space-y-6">
@@ -56,7 +54,7 @@ export default async function CostExecutionDetailPage({
         </div>
         <div className="flex gap-2">
           <Link href={`/cost/${projectId}/execution/${id}`}><Button>편집</Button></Link>
-          <form action={handleDelete}>
+          <form action={deleteCostExecutionAction.bind(null, id, projectId)}>
             <Button type="submit" variant="destructive">삭제</Button>
           </form>
         </div>

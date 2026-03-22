@@ -1,35 +1,16 @@
-'use client'
-'use server'
-
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { createSales, listCustomers } from '@/app/actions/sales'
+import { listCustomers } from '@/app/actions/sales'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { submitSalesAction } from './actions'
 
 export default async function NewSalesPage() {
   const session = await auth()
-  if (!session) return null
+  if (!session) redirect('/signin')
 
   const customers = await listCustomers()
-
-  async function handleSubmit(formData: FormData) {
-    'use server'
-    const data = {
-      title: formData.get('title') as string,
-      type: formData.get('type') as string,
-      status: 'DRAFT',
-      bidNumber: formData.get('bidNumber') as string,
-      bidAmount: parseFloat(formData.get('bidAmount') as string) || 0,
-      contractAmount: 0,
-      winProbability: parseFloat(formData.get('winProbability') as string) || undefined,
-      bidOpenDate: formData.get('bidOpenDate') as string,
-      customerId: formData.get('customerId') as string,
-      description: formData.get('description') as string,
-    }
-    const sales = await createSales(data)
-    redirect('/sales')
-  }
 
   return (
     <div className="space-y-6">
@@ -37,7 +18,7 @@ export default async function NewSalesPage() {
       <Card>
         <CardHeader><CardTitle>영업 정보</CardTitle></CardHeader>
         <CardContent>
-          <form action={handleSubmit} className="space-y-4">
+          <form action={submitSalesAction} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-medium">현황명 *</label>
@@ -82,7 +63,7 @@ export default async function NewSalesPage() {
             </div>
             <div className="flex gap-2">
               <Button type="submit">생성</Button>
-              <a href="/sales"><Button variant="outline" type="button">취소</Button></a>
+              <Link href="/sales"><Button variant="outline" type="button">취소</Button></Link>
             </div>
           </form>
         </CardContent>

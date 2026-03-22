@@ -2,10 +2,12 @@
 import { notFound } from 'next/navigation'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { getPurchaseOrder, updatePurchaseOrderStatus, deletePurchaseOrder } from '@/app/actions/purchase-orders'
+import { auth } from '@/lib/auth'
+import { getPurchaseOrder } from '@/app/actions/purchase-orders'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { updateStatusAction, deleteOrderAction } from './actions'
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: '작성중', SENT: '발송', PARTIAL: '부분입고',
@@ -13,23 +15,14 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session) return null
+
   const { id } = await params
   const order = await getPurchaseOrder(id)
   if (!order) notFound()
 
   const fmt = (n: number) => `${n.toLocaleString('ko-KR')}원`
-
-  async function handleStatusChange(status: string) {
-    'use server'
-    await updatePurchaseOrderStatus(id, status)
-    redirect(`/orders/${id}`)
-  }
-
-  async function handleDelete() {
-    'use server'
-    await deletePurchaseOrder(id)
-    redirect('/orders')
-  }
 
   return (
     <div className="space-y-6">
@@ -40,19 +33,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </div>
         <div className="flex gap-2">
           {order.status === 'DRAFT' && (
-            <form action={handleStatusChange.bind(null, 'SENT')}>
+            <form action={updateStatusAction.bind(null, id, 'SENT')}>
               <Button type="submit">발송 처리</Button>
             </form>
           )}
           {order.status === 'SENT' && (
-            <form action={handleStatusChange.bind(null, 'RECEIVED')}>
+            <form action={updateStatusAction.bind(null, id, 'RECEIVED')}>
               <Button type="submit">입고 완료</Button>
             </form>
           )}
           <Link href={`/receipts/new?poId=${order.id}`}>
             <Button variant="secondary">입고 등록</Button>
           </Link>
-          <form action={handleDelete}>
+          <form action={deleteOrderAction.bind(null, id)}>
             <Button type="submit" variant="destructive">삭제</Button>
           </form>
         </div>

@@ -1,5 +1,6 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
+import { auth } from '@/lib/auth'
 import { getProject, getCostExecution } from '@/app/actions/projects'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,9 @@ const COST_ROWS = [
 ] as const
 
 export default async function CostExecutionFormPage({ params }: { params: Promise<{ projectId: string; id?: string }> }) {
+  const session = await auth()
+  if (!session) redirect('/signin')
+  
   const { projectId, id } = await params
   const project = await getProject(projectId)
   if (!project) notFound()
