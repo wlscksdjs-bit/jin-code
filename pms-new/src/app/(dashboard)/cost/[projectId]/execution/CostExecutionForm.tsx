@@ -148,10 +148,11 @@ export function CostExecutionForm({ projectId, id }: CostExecutionFormProps) {
         </div>
       )}
 
-      <form action={submitCostExecution} onSubmit={handleSubmit} className="space-y-6">
+      <form action={submitCostExecution} className="space-y-6">
         <input type="hidden" name="projectId" value={projectId} />
         {id && <input type="hidden" name="id" value={id} />}
-        
+        <input type="hidden" name="fabricationVendors" value={JSON.stringify(fabVendors)} />
+        <input type="hidden" name="serviceVendors" value={JSON.stringify(svcVendors)} />
         <Card>
           <CardHeader><CardTitle>기간 정보</CardTitle></CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-4">
