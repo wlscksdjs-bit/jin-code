@@ -140,6 +140,6 @@ export async function listCustomers() {
     orderBy: { name: 'asc' },
   })
 }
-
-export async function getCostEstimate(projectId: string) { return null; }
-export async function getCostExecution(projectId: string) { return []; }
+// ✅ 새로 붙여넣을 코드
+export async function getCostEstimate(projectId: string) { return {} as any; }
+export async function getCostExecution(projectId: string) { return [] as any; }
