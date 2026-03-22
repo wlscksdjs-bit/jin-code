@@ -140,3 +140,26 @@ export async function listCustomers() {
     orderBy: { name: 'asc' },
   })
 }
+
+// ... 기존 코드(listCustomers 함수) 아래에 추가 ...
+
+// 빌드 에러 방지용 임시 함수: 견적 원가 불러오기
+export async function getCostEstimate(projectId: string) {
+  const session = await auth()
+  if (!session) throw new Error('Unauthorized')
+
+  // 아직 실제 로직이 없다면 임시로 빈 배열이나 null을 반환합니다.
+  return null;
+}
+
+// 빌드 에러 방지용 임시 함수: 실행 원가 불러오기
+export async function getCostExecution(projectId: string) {
+  const session = await auth()
+  if (!session) throw new Error('Unauthorized')
+
+  // 아직 실제 로직이 없다면 임시로 빈 배열을 반환합니다.
+  return [];
+}
+
+export async function getCostEstimate(projectId: string) { return null; }
+export async function getCostExecution(projectId: string) { return []; }

@@ -161,3 +161,10 @@ export async function listVendors() {
   if (!session) throw new Error('Unauthorized')
   return prisma.vendor.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } })
 }
+
+// 빌드 에러 방지용 임시 함수: 발주 품목 불러오기
+export async function listPurchaseOrderItems() {
+  return [];
+}
+
+export async function listPurchaseOrderItems() { return []; }
