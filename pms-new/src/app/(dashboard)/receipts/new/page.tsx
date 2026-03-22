@@ -1,11 +1,9 @@
-'use server'
-
-import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { auth } from '@/lib/auth'
-import { createMaterialReceipt, listPurchaseOrderItems } from '@/app/actions/material-receipts'
-import { getPurchaseOrder } from '@/app/actions/purchase-orders'
+import { getPurchaseOrder, listPurchaseOrderItems } from '@/app/actions/purchase-orders'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { submitReceipt } from './actions'
 
 export default async function NewReceiptPage({ searchParams }: { params: Promise<Record<string, string>>; searchParams: Promise<{ poId?: string }> }) {
   const sp = await searchParams
@@ -20,36 +18,6 @@ export default async function NewReceiptPage({ searchParams }: { params: Promise
   }
 
   const fmt = (n: number) => `${n.toLocaleString('ko-KR')}원`
-
-  async function handleSubmit(formData: FormData) {
-    'use server'
-    if (!sp.poId) throw new Error('No purchase order')
-
-    const itemCount = parseInt(formData.get('itemCount') as string) || 0
-    const items = []
-    for (let i = 0; i < itemCount; i++) {
-      const qty = parseFloat(formData.get(`item_qty_${i}`) as string) || 0
-      if (qty > 0) {
-        items.push({
-          itemName: formData.get(`item_name_${i}`) as string,
-          specification: formData.get(`item_spec_${i}`) as string,
-          unit: formData.get(`item_unit_${i}`) as string,
-          quantity: qty,
-          unitPrice: parseFloat(formData.get(`item_price_${i}`) as string) || 0,
-          amount: qty * (parseFloat(formData.get(`item_price_${i}`) as string) || 0),
-        })
-      }
-    }
-
-    const data = {
-      purchaseOrderId: sp.poId,
-      receiptDate: formData.get('receiptDate') as string,
-      receivedBy: formData.get('receivedBy') as string,
-      items,
-    }
-    await createMaterialReceipt(data)
-    redirect('/receipts')
-  }
 
   if (!order) {
     return (
@@ -71,7 +39,7 @@ export default async function NewReceiptPage({ searchParams }: { params: Promise
       <Card>
         <CardHeader><CardTitle>입고 품목</CardTitle></CardHeader>
         <CardContent>
-          <form action={handleSubmit} className="space-y-4">
+          <form action={submitReceipt.bind(null, sp.poId!)} className="space-y-4">
             <input type="hidden" name="itemCount" id="itemCount" value={poItems.length} />
             <table className="w-full text-sm">
               <thead>
@@ -126,7 +94,7 @@ export default async function NewReceiptPage({ searchParams }: { params: Promise
             </div>
             <div className="flex gap-2 border-t pt-4">
               <Button type="submit">입고 완료</Button>
-              <Button type="button" variant="outline" onClick={() => redirect('/receipts')}>취소</Button>
+              <Link href={'/receipts'}><Button variant="outline" type="button">취소</Button></Link>
             </div>
           </form>
         </CardContent>

@@ -1,32 +1,11 @@
-'use server'
-
-import { redirect } from 'next/navigation'
-import { createProject, listCustomers } from '@/app/actions/projects'
+import Link from 'next/link'
+import { listCustomers } from '@/app/actions/projects'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { createProjectAction } from './actions'
 
 export default async function NewProjectPage() {
   const customers = await listCustomers()
-
-  async function handleSubmit(formData: FormData) {
-    'use server'
-    const data = {
-      code: formData.get('code') as string,
-      name: formData.get('name') as string,
-      type: formData.get('type') as string,
-      status: 'REGISTERED',
-      contractType: formData.get('contractType') as string,
-      startDate: formData.get('startDate') as string,
-      endDate: formData.get('endDate') as string,
-      contractAmount: parseFloat(formData.get('contractAmount') as string) || 0,
-      estimatedBudget: parseFloat(formData.get('estimatedBudget') as string) || 0,
-      location: formData.get('location') as string,
-      description: formData.get('description') as string,
-      customerId: formData.get('customerId') as string,
-    }
-    const project = await createProject(data)
-    redirect(`/projects/${project.id}`)
-  }
 
   return (
     <div className="space-y-6">
@@ -36,7 +15,7 @@ export default async function NewProjectPage() {
       <Card>
         <CardHeader><CardTitle>프로젝트 정보</CardTitle></CardHeader>
         <CardContent>
-          <form action={handleSubmit} className="space-y-4">
+          <form action={createProjectAction} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium">프로젝트 코드 *</label>
@@ -102,7 +81,7 @@ export default async function NewProjectPage() {
             </div>
             <div className="flex gap-2">
               <Button type="submit">생성</Button>
-              <Button type="button" variant="outline" onClick={() => redirect('/projects')}>취소</Button>
+              <Link href="/projects"><Button variant="outline" type="button">취소</Button></Link>
             </div>
           </form>
         </CardContent>

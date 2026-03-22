@@ -1,3 +1,5 @@
+'use client'
+
 import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
@@ -30,8 +32,15 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
 
+    // ButtonProps 인터페이스에 asChild 속성 추가 예시
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  // 기존 속성들...
+  asChild?: boolean;
+}
+
+}
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, ...props }, ref) => {
     return (

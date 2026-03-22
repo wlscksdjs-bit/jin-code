@@ -1,3 +1,4 @@
+'use client'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

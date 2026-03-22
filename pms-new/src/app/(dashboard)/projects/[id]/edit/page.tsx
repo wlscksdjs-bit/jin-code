@@ -1,34 +1,14 @@
-'use server'
-
-import { redirect } from 'next/navigation'
 import { notFound } from 'next/navigation'
-import { getProject, updateProject, listCustomers } from '@/app/actions/projects'
+import Link from 'next/link'
+import { getProject, listCustomers } from '@/app/actions/projects'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { updateProjectAction } from './actions'
 
 export default async function EditProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const [project, customers] = await Promise.all([getProject(id), listCustomers()])
   if (!project) notFound()
-
-  async function handleSubmit(formData: FormData) {
-    'use server'
-    const data = {
-      name: formData.get('name') as string,
-      type: formData.get('type') as string,
-      status: formData.get('status') as string,
-      contractType: formData.get('contractType') as string,
-      startDate: formData.get('startDate') as string,
-      endDate: formData.get('endDate') as string,
-      contractAmount: parseFloat(formData.get('contractAmount') as string) || 0,
-      estimatedBudget: parseFloat(formData.get('estimatedBudget') as string) || 0,
-      location: formData.get('location') as string,
-      description: formData.get('description') as string,
-      customerId: formData.get('customerId') as string,
-    }
-    await updateProject(id, data)
-    redirect(`/projects/${id}`)
-  }
 
   const fmtDate = (d: Date | string | null) => d ? new Date(d).toISOString().split('T')[0] : ''
 
@@ -38,7 +18,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
       <Card>
         <CardHeader><CardTitle>프로젝트 정보</CardTitle></CardHeader>
         <CardContent>
-          <form action={handleSubmit} className="space-y-4">
+          <form action={updateProjectAction.bind(null, id)} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium">프로젝트 코드</label>
@@ -102,7 +82,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
             </div>
             <div className="flex gap-2">
               <Button type="submit">저장</Button>
-              <Button type="button" variant="outline" onClick={() => redirect(`/projects/${id}`)}>취소</Button>
+              <Link href={`/projects/${id}`}><Button variant="outline" type="button">취소</Button></Link>
             </div>
           </form>
         </CardContent>

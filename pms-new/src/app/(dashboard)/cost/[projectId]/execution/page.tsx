@@ -1,11 +1,9 @@
-'use server'
-
-import { redirect } from 'next/navigation'
 import { notFound } from 'next/navigation'
-import { getProject } from '@/app/actions/projects'
-import { createCostExecution, updateCostExecution } from '@/app/actions/cost-executions'
+import Link from 'next/link'
+import { getProject, getCostExecution } from '@/app/actions/projects'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { submitCostExecution } from './actions'
 
 const COST_ROWS = [
   { key: 'materialCost', label: '재료비' },
@@ -16,11 +14,11 @@ const COST_ROWS = [
   { key: 'consumableSafety', label: '안전용품' },
   { key: 'travelExpense', label: '여비교통비' },
   { key: 'insuranceWarranty', label: '보험/보증' },
-  { key: 'dormitoryCost', label: '宿舍비' },
+  { key: 'dormitoryCost', label: '숙소비' },
   { key: 'miscellaneous', label: '잡비' },
   { key: 'paymentFeeOther', label: '지급수수료' },
-  { key: 'rentalForklift', label: '지반료(지게차)' },
-  { key: 'rentalOther', label: '지반료(기타)' },
+  { key: 'rentalForklift', label: '장비임대(지게차)' },
+  { key: 'rentalOther', label: '장비임대(기타)' },
   { key: 'vehicleRepair', label: '차량수리비' },
   { key: 'vehicleFuel', label: '차량유류비' },
   { key: 'vehicleOther', label: '차량기타' },
@@ -36,7 +34,6 @@ export default async function CostExecutionFormPage({ params }: { params: Promis
 
   let existing: Record<string, unknown> | undefined
   if (id) {
-    const { getCostExecution } = await import('@/app/actions/cost-executions')
     existing = await getCostExecution(id) as Record<string, unknown> | undefined
   }
 
@@ -44,28 +41,6 @@ export default async function CostExecutionFormPage({ params }: { params: Promis
   const now = new Date()
   const defaultYear = existing ? (existing.periodYear as number) : now.getFullYear()
   const defaultMonth = existing ? (existing.periodMonth as number) : now.getMonth() + 1
-
-  async function handleSubmit(formData: FormData) {
-    'use server'
-    const data: Record<string, number | string> = {
-      projectId,
-      periodYear: parseInt(formData.get('periodYear') as string),
-      periodMonth: parseInt(formData.get('periodMonth') as string),
-      status: formData.get('status') as string,
-      contractAmount: parseFloat(formData.get('contractAmount') as string) || 0,
-      sellingAdminRate: parseFloat(formData.get('sellingAdminRate') as string) || 12,
-    }
-    for (const row of COST_ROWS) {
-      data[row.key] = parseFloat(formData.get(row.key) as string) || 0
-    }
-    if (id) {
-      await updateCostExecution(id, data as Parameters<typeof updateCostExecution>[1])
-      redirect(`/cost/${projectId}/execution/${id}`)
-    } else {
-      const exec = await createCostExecution(data as Parameters<typeof createCostExecution>[0])
-      redirect(`/cost/${projectId}/execution/${(exec as { id: string }).id}`)
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -76,7 +51,7 @@ export default async function CostExecutionFormPage({ params }: { params: Promis
         <p className="text-sm text-gray-500">{project.name}</p>
       </div>
 
-      <form action={handleSubmit} className="space-y-6">
+      <form action={submitCostExecution.bind(null, projectId, id)} className="space-y-6">
         <Card>
           <CardHeader><CardTitle>기간 정보</CardTitle></CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-4">
@@ -128,7 +103,7 @@ export default async function CostExecutionFormPage({ params }: { params: Promis
 
         <div className="flex gap-2">
           <Button type="submit">{id ? '저장' : '등록'}</Button>
-          <Button type="button" variant="outline" onClick={() => redirect(`/projects/${projectId}`)}>취소</Button>
+          <Link href={`/projects/${projectId}`}><Button variant="outline" type="button">취소</Button></Link>
         </div>
       </form>
     </div>

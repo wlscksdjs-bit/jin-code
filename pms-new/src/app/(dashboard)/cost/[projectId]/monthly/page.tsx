@@ -1,3 +1,4 @@
+'use client'
 import { notFound } from 'next/navigation'
 import { getCostExecutionMonthlySummary, aggregateProjectDashboard } from '@/app/actions/dashboard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
