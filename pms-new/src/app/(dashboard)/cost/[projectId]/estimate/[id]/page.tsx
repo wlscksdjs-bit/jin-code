@@ -1,4 +1,3 @@
-'use client'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'

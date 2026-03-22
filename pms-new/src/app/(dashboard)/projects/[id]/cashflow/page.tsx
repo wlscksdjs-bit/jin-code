@@ -1,4 +1,3 @@
-'use client'
 import { notFound } from 'next/navigation'
 import { getProject } from '@/app/actions/projects'
 import { getCashFlowSummary, listCashFlows, createCashFlow } from '@/app/actions/cash-flow'

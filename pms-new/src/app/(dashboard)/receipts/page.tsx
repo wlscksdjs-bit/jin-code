@@ -1,4 +1,3 @@
-'use client'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { listMaterialReceipts } from '@/app/actions/material-receipts'
