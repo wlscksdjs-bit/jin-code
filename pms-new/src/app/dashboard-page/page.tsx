@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { listProjects } from '@/app/actions/projects'
-import { aggregateProjectDashboard, refreshAllDashboards } from '@/app/actions/dashboard'
+import { getProjectDashboardData } from '@/app/actions/dashboard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { DashboardAlerts } from '@/components/dashboard-alerts'
@@ -11,13 +11,12 @@ export default async function DashboardPage() {
   if (!session) return null
 
   const projects = await listProjects()
-  const refreshed = await refreshAllDashboards()
 
   const fmt = (n: number) => `${n.toLocaleString('ko-KR')}원`
 
   const projectKPIs = await Promise.all(
     projects.slice(0, 5).map(async (p) => {
-      const dash = await aggregateProjectDashboard(p.id)
+      const dash = await getProjectDashboardData(p.id)
       return { ...p, dash }
     })
   )

@@ -86,14 +86,20 @@ export async function getCostExecutionMonthlySummary(projectId: string) {
   return { rows, contractAmount }
 }
 
-export async function aggregateProjectDashboard(projectId: string) {
-  const session = await auth()
-  if (!session) throw new Error('Unauthorized')
-
+// Pure data fetching function - safe to call during render
+export async function getProjectDashboardData(projectId: string) {
   const [project, executions, cashFlows] = await Promise.all([
     prisma.project.findUnique({
       where: { id: projectId },
-      select: { contractAmount: true, estimatedBudget: true },
+      select: { 
+        contractAmount: true, 
+        estimatedBudget: true,
+        budgetUsageRate: true,
+        costForecastRate: true,
+        totalCashInflow: true,
+        totalCashOutflow: true,
+        currentCashBalance: true,
+      },
     }),
     prisma.costExecution.findMany({ where: { projectId } }),
     prisma.cashFlow.findMany({ where: { projectId } }),
@@ -130,57 +136,75 @@ export async function aggregateProjectDashboard(projectId: string) {
   const grossProfit = latestExecution?.grossProfit ?? 0
   const profitRate = contractAmount > 0 ? (operatingProfit / contractAmount) * 100 : 0
 
-  const result = await prisma.projectDashboard.upsert({
+  return {
+    budgetUsageRate,
+    contractAmount,
+    totalCost,
+    grossProfit,
+    operatingProfit,
+    profitRate,
+    totalCashInflow,
+    totalCashOutflow,
+    currentCashBalance: totalCashInflow - totalCashOutflow,
+    isOnBudget: budgetUsageRate <= 100,
+    isOnSchedule: true,
+  }
+}
+
+// Mutation + revalidation - must be called from Server Actions only
+export async function refreshProjectDashboard(projectId: string) {
+  const session = await auth()
+  if (!session) throw new Error('Unauthorized')
+
+  const data = await getProjectDashboardData(projectId)
+
+  await prisma.projectDashboard.upsert({
     where: { projectId },
     create: {
       projectId,
-      pv, ev, ac, bac, cpi, spi: 1,
-      eac, vac,
-      progress: budgetUsageRate,
-      budgetUsageRate,
-      contractAmount,
-      totalCost,
-      grossProfit,
-      operatingProfit,
-      profitRate,
-      totalCashInflow,
-      totalCashOutflow,
-      currentCashBalance: totalCashInflow - totalCashOutflow,
-      isOnBudget: budgetUsageRate <= 100,
+      pv: data.contractAmount,
+      ev: data.contractAmount * (data.budgetUsageRate / 100),
+      ac: data.totalCost,
+      bac: 0,
+      cpi: 1,
+      spi: 1,
+      eac: 0,
+      vac: 0,
+      progress: data.budgetUsageRate,
+      budgetUsageRate: data.budgetUsageRate,
+      contractAmount: data.contractAmount,
+      totalCost: data.totalCost,
+      grossProfit: data.grossProfit,
+      operatingProfit: data.operatingProfit,
+      profitRate: data.profitRate,
+      totalCashInflow: data.totalCashInflow,
+      totalCashOutflow: data.totalCashOutflow,
+      currentCashBalance: data.currentCashBalance,
+      isOnBudget: data.isOnBudget,
       isOnSchedule: true,
     },
     update: {
-      pv, ev, ac, bac, cpi, spi: 1,
-      eac, vac,
-      progress: budgetUsageRate,
-      budgetUsageRate,
-      contractAmount,
-      totalCost,
-      grossProfit,
-      operatingProfit,
-      profitRate,
-      totalCashInflow,
-      totalCashOutflow,
-      currentCashBalance: totalCashInflow - totalCashOutflow,
-      isOnBudget: budgetUsageRate <= 100,
-      isOnSchedule: true,
-    },
-  })
-
-  await prisma.project.update({
-    where: { id: projectId },
-    data: {
-      budgetUsageRate,
-      costForecastRate: estimatedBudget > 0 ? (totalCost / estimatedBudget) * 100 : 0,
-      totalCashInflow,
-      totalCashOutflow,
-      currentCashBalance: totalCashInflow - totalCashOutflow,
+      budgetUsageRate: data.budgetUsageRate,
+      contractAmount: data.contractAmount,
+      totalCost: data.totalCost,
+      grossProfit: data.grossProfit,
+      operatingProfit: data.operatingProfit,
+      profitRate: data.profitRate,
+      totalCashInflow: data.totalCashInflow,
+      totalCashOutflow: data.totalCashOutflow,
+      currentCashBalance: data.currentCashBalance,
+      isOnBudget: data.isOnBudget,
     },
   })
 
   revalidatePath(`/projects/${projectId}`)
   revalidatePath('/')
-  return result
+  revalidatePath('/dashboard-page')
+}
+
+// Keep for backward compatibility
+export async function aggregateProjectDashboard(projectId: string) {
+  return refreshProjectDashboard(projectId)
 }
 
 export async function refreshAllDashboards() {
@@ -193,7 +217,7 @@ export async function refreshAllDashboards() {
   })
 
   const results = await Promise.allSettled(
-    projects.map((p) => aggregateProjectDashboard(p.id))
+    projects.map((p) => refreshProjectDashboard(p.id))
   )
 
   return { total: projects.length, succeeded: results.filter((r) => r.status === 'fulfilled').length }
