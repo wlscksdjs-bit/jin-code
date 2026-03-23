@@ -1,17 +1,6 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('API Tests', () => {
-  test.beforeAll(async ({ request }) => {
-    // Login to get session cookie
-    await request.post('/api/auth/callback/credentials', {
-      form: {
-        email: 'admin@pms.com',
-        password: 'admin123',
-        redirect: 'false',
-      },
-    })
-  })
-
   test('GET /api/projects returns project list', async ({ request }) => {
     // Note: These tests need auth token
     // Skip if not authenticated

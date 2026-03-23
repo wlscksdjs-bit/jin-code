@@ -26,19 +26,40 @@ export interface ParsedEstimateData {
     reserveFund: number
     indirectCost: number
   }
+  calculated: {
+    totalDirectCost: number
+    totalIndirectCost: number
+    totalManufacturingCost: number
+    sellingAdminCost: number
+    grossProfit: number
+    operatingProfit: number
+    profitRate: number
+  }
 }
 
-const INDIRECT_ITEMS = [
-  '소모품/기타', '안전용품', '여비교통비', '보험/보증', '숙소비', '잡비',
-  '지급수수료', '장비임대(지게차)', '장비임대(기타)', '차량수리비', '차량유류비',
-  '차량기타', '복리후생', '예비비', '간접비'
+const INDIRECT_COST_FIELDS: { key: keyof ParsedEstimateData['costs']; label: string }[] = [
+  { key: 'consumableOther', label: '소모품/기타' },
+  { key: 'consumableSafety', label: '안전용품' },
+  { key: 'travelExpense', label: '여비교통비' },
+  { key: 'insuranceWarranty', label: '보험/보증' },
+  { key: 'dormitoryCost', label: '숙소비' },
+  { key: 'miscellaneous', label: '잡비' },
+  { key: 'paymentFeeOther', label: '지급수수료' },
+  { key: 'rentalForklift', label: '장비임대(지게차)' },
+  { key: 'rentalOther', label: '장비임대(기타)' },
+  { key: 'vehicleRepair', label: '차량수리비' },
+  { key: 'vehicleFuel', label: '차량유류비' },
+  { key: 'vehicleOther', label: '차량기타' },
+  { key: 'welfareBusiness', label: '복리후생' },
+  { key: 'reserveFund', label: '예비비' },
+  { key: 'indirectCost', label: '간접비' },
 ]
 
-const INDIRECT_KEYS = [
-  'consumableOther', 'consumableSafety', 'travelExpense', 'insuranceWarranty',
-  'dormitoryCost', 'miscellaneous', 'paymentFeeOther', 'rentalForklift',
-  'rentalOther', 'vehicleRepair', 'vehicleFuel', 'vehicleOther',
-  'welfareBusiness', 'reserveFund', 'indirectCost'
+const DIRECT_COST_FIELDS: { key: keyof ParsedEstimateData['costs']; label: string }[] = [
+  { key: 'materialCost', label: '재료비' },
+  { key: 'laborCost', label: '노무비' },
+  { key: 'outsourceFabrication', label: '외주비(제작)' },
+  { key: 'outsourceService', label: '외주비(용역)' },
 ]
 
 export function generateEstimateTemplate(projectName: string): XLSX.Workbook {
@@ -47,65 +68,60 @@ export function generateEstimateTemplate(projectName: string): XLSX.Workbook {
   const guideData = [
     ['견적원가 등록 Excel 양식'],
     [''],
-    [`프로젝트: ${projectName}`],
-    [''],
     ['작성법:'],
-    ['1. 기본정보 시트에서 제목, 버전, 계약금액, 판관비율을 입력하세요'],
-    ['2. 직접비 시트에서 직접비 항목을 입력하세요'],
-    ['3. 간접비 시트에서 간접비 항목을 입력하세요'],
-    ['4. 요약 시트에서 계산 결과를 확인하세요'],
+    ['1. 기본정보 시트에서 프로젝트명, 제목, 버전, 계약금액, 판관비율을 입력하세요'],
+    ['2. 직접비 시트에서 각 항목의 금액을 입력하세요'],
+    ['3. 간접비 시트에서 각 항목의 금액을 입력하세요'],
+    ['4. 금액은 숫자만 입력하세요 (원, 천원 등 단위 불가)'],
     [''],
     ['주의사항:'],
-    ['- 금액은 숫자만 입력하세요 (원, 천원 등 단위 불가)'],
-    ['- 판관비율은 % 단위로 입력하세요 (예: 12)'],
+    ['- 금액은 숫자만 입력하세요'],
+    ['- 판관비율은 % 단위로 입력하세요 (예: 5.5)'],
   ]
   const guideSheet = XLSX.utils.aoa_to_sheet(guideData)
-  guideSheet['!cols'] = [{ wch: 50 }]
+  guideSheet['!cols'] = [{ wch: 60 }]
   XLSX.utils.book_append_sheet(wb, guideSheet, '안내')
 
-  const basicData = [
-    ['항목', '입력값'],
+  const infoData = [
+    ['항목', '내용'],
+    ['프로젝트명', projectName],
     ['제목', ''],
-    ['버전', '1.0'],
-    ['계약금액', ''],
-    ['판관비율(%)', '12'],
+    ['버전', 'v1.0'],
+    ['계약금액', 0],
+    ['판관비율(%)', 0],
   ]
-  const basicSheet = XLSX.utils.aoa_to_sheet(basicData)
-  basicSheet['!cols'] = [{ wch: 20 }, { wch: 30 }]
-  XLSX.utils.book_append_sheet(wb, basicSheet, '기본정보')
+  const infoSheet = XLSX.utils.aoa_to_sheet(infoData)
+  infoSheet['!cols'] = [{ wch: 20 }, { wch: 40 }]
+  XLSX.utils.book_append_sheet(wb, infoSheet, '기본정보')
 
-  const directData = [
-    ['구분', '항목', '금액', '비고'],
-    ['직접비', '재료비', '', ''],
-    ['직접비', '노무비', '', ''],
-    ['직접비', '외주비(제작)', '', ''],
-    ['직접비', '외주비(용역)', '', ''],
-  ]
+  const directData = [['항목', '금액']]
+  for (const field of DIRECT_COST_FIELDS) {
+    directData.push([field.label, 0])
+  }
   const directSheet = XLSX.utils.aoa_to_sheet(directData)
-  directSheet['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }]
+  directSheet['!cols'] = [{ wch: 20 }, { wch: 20 }]
   XLSX.utils.book_append_sheet(wb, directSheet, '직접비')
 
-  const indirectData = [['구분', '항목', '금액', '비고']]
-  for (const cat of INDIRECT_ITEMS) {
-    indirectData.push(['간접비', cat, '', ''])
+  const indirectData = [['항목', '금액']]
+  for (const field of INDIRECT_COST_FIELDS) {
+    indirectData.push([field.label, 0])
   }
   const indirectSheet = XLSX.utils.aoa_to_sheet(indirectData)
-  indirectSheet['!cols'] = [{ wch: 10 }, { wch: 18 }, { wch: 15 }, { wch: 15 }]
+  indirectSheet['!cols'] = [{ wch: 20 }, { wch: 20 }]
   XLSX.utils.book_append_sheet(wb, indirectSheet, '간접비')
 
   const summaryData = [
     ['항목', '금액'],
-    ['계약금액', ''],
-    ['직접비 합계', ''],
-    ['간접비 합계', ''],
-    ['총제조원가', ''],
-    ['판관비', ''],
-    ['총원가', ''],
-    ['영업이익', ''],
-    ['이익률(%)', ''],
+    ['직접비 합계', 0],
+    ['간접비 합계', 0],
+    ['총제조원가', 0],
+    ['판관비', 0],
+    ['매출총이익', 0],
+    ['영업이익', 0],
+    ['이익률(%)', 0],
   ]
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
-  summarySheet['!cols'] = [{ wch: 15 }, { wch: 15 }]
+  summarySheet['!cols'] = [{ wch: 20 }, { wch: 20 }]
   XLSX.utils.book_append_sheet(wb, summarySheet, '요약')
 
   return wb
@@ -113,19 +129,12 @@ export function generateEstimateTemplate(projectName: string): XLSX.Workbook {
 
 export function parseEstimateExcel(buffer: ArrayBuffer): ParsedEstimateData {
   const wb = XLSX.read(buffer, { type: 'array' })
-  
-  let title = '견적원가'
-  let version = '1.0'
-  let contractAmount = 0
-  let sellingAdminRate = 12
 
-  const basicSheet = wb.Sheets['기본정보']
-  if (basicSheet) {
-    title = (basicSheet['B2']?.v as string) || '견적원가'
-    version = (basicSheet['B3']?.v as string) || '1.0'
-    contractAmount = (basicSheet['B4']?.v as number) || 0
-    sellingAdminRate = (basicSheet['B5']?.v as number) || 12
-  }
+  const infoSheet = wb.Sheets['기본정보']
+  const title = (infoSheet?.['B3']?.v as string) || ''
+  const version = (infoSheet?.['B4']?.v as string) || ''
+  const contractAmount = (infoSheet?.['B5']?.v as number) || 0
+  const sellingAdminRate = (infoSheet?.['B6']?.v as number) || 0
 
   const costs: ParsedEstimateData['costs'] = {
     materialCost: 0,
@@ -151,32 +160,54 @@ export function parseEstimateExcel(buffer: ArrayBuffer): ParsedEstimateData {
 
   const directSheet = wb.Sheets['직접비']
   if (directSheet) {
-    const range = XLSX.utils.decode_range(directSheet['!ref'] || 'A1:D10')
+    const range = XLSX.utils.decode_range(directSheet['!ref'] || 'A1:B5')
     for (let r = 1; r <= range.e.r; r++) {
-      const item = directSheet[XLSX.utils.encode_cell({ r, c: 1 })]?.v as string
-      const amount = (directSheet[XLSX.utils.encode_cell({ r, c: 2 })]?.v as number) || 0
-      if (item === '재료비') costs.materialCost = amount
-      else if (item === '노무비') costs.laborCost = amount
-      else if (item === '외주비(제작)') costs.outsourceFabrication = amount
-      else if (item === '외주비(용역)') costs.outsourceService = amount
+      const label = directSheet[XLSX.utils.encode_cell({ r, c: 0 })]?.v as string
+      const amount = (directSheet[XLSX.utils.encode_cell({ r, c: 1 })]?.v as number) || 0
+      const field = DIRECT_COST_FIELDS.find((f) => f.label === label)
+      if (field) {
+        costs[field.key] = amount
+      }
     }
   }
 
   const indirectSheet = wb.Sheets['간접비']
   if (indirectSheet) {
-    const range = XLSX.utils.decode_range(indirectSheet['!ref'] || 'A1:D20')
+    const range = XLSX.utils.decode_range(indirectSheet['!ref'] || 'A1:B16')
     for (let r = 1; r <= range.e.r; r++) {
-      const item = indirectSheet[XLSX.utils.encode_cell({ r, c: 1 })]?.v as string
-      const name = indirectSheet[XLSX.utils.encode_cell({ r, c: 1 })]?.v as string
-      const amount = (indirectSheet[XLSX.utils.encode_cell({ r, c: 2 })]?.v as number) || 0
-      if (item === '간접비') {
-        const idx = INDIRECT_ITEMS.indexOf(name)
-        if (idx >= 0) {
-          costs[INDIRECT_KEYS[idx] as keyof typeof costs] = amount
-        }
+      const label = indirectSheet[XLSX.utils.encode_cell({ r, c: 0 })]?.v as string
+      const amount = (indirectSheet[XLSX.utils.encode_cell({ r, c: 1 })]?.v as number) || 0
+      const field = INDIRECT_COST_FIELDS.find((f) => f.label === label)
+      if (field) {
+        costs[field.key] = amount
       }
     }
   }
+
+  const totalDirectCost =
+    costs.materialCost + costs.laborCost + costs.outsourceFabrication + costs.outsourceService
+  const totalIndirectCost =
+    costs.consumableOther +
+    costs.consumableSafety +
+    costs.travelExpense +
+    costs.insuranceWarranty +
+    costs.dormitoryCost +
+    costs.miscellaneous +
+    costs.paymentFeeOther +
+    costs.rentalForklift +
+    costs.rentalOther +
+    costs.vehicleRepair +
+    costs.vehicleFuel +
+    costs.vehicleOther +
+    costs.welfareBusiness +
+    costs.reserveFund +
+    costs.indirectCost
+
+  const totalManufacturingCost = totalDirectCost + totalIndirectCost
+  const sellingAdminCost = Math.round(contractAmount * (sellingAdminRate / 100))
+  const grossProfit = contractAmount - totalManufacturingCost
+  const operatingProfit = grossProfit - sellingAdminCost
+  const profitRate = contractAmount > 0 ? (operatingProfit / contractAmount) * 100 : 0
 
   return {
     title,
@@ -184,53 +215,62 @@ export function parseEstimateExcel(buffer: ArrayBuffer): ParsedEstimateData {
     contractAmount,
     sellingAdminRate,
     costs,
+    calculated: {
+      totalDirectCost,
+      totalIndirectCost,
+      totalManufacturingCost,
+      sellingAdminCost,
+      grossProfit,
+      operatingProfit,
+      profitRate,
+    },
   }
 }
 
 export function exportEstimateToExcel(estimate: Record<string, unknown>): XLSX.Workbook {
   const wb = XLSX.utils.book_new()
-  
-  const data = [
-    ['항목', '금액'],
-    ['제목', estimate.title as string],
-    ['버전', estimate.version as string],
-    ['계약금액', estimate.contractAmount as number],
-    ['', ''],
-    ['직접비', ''],
-    ['재료비', estimate.materialCost as number],
-    ['노무비', estimate.laborCost as number],
-    ['외주비(제작)', estimate.outsourceFabrication as number],
-    ['외주비(용역)', estimate.outsourceService as number],
-    ['직접비 합계', estimate.totalDirectCost as number],
-    ['', ''],
-    ['간접비 항목', ''],
-    ['소모품/기타', estimate.consumableOther as number],
-    ['안전용품', estimate.consumableSafety as number],
-    ['여비교통비', estimate.travelExpense as number],
-    ['보험/보증', estimate.insuranceWarranty as number],
-    ['숙소비', estimate.dormitoryCost as number],
-    ['잡비', estimate.miscellaneous as number],
-    ['지급수수료', estimate.paymentFeeOther as number],
-    ['장비임대(지게차)', estimate.rentalForklift as number],
-    ['장비임대(기타)', estimate.rentalOther as number],
-    ['차량수리비', estimate.vehicleRepair as number],
-    ['차량유류비', estimate.vehicleFuel as number],
-    ['차량기타', estimate.vehicleOther as number],
-    ['복리후생', estimate.welfareBusiness as number],
-    ['예비비', estimate.reserveFund as number],
-    ['간접비', estimate.indirectCost as number],
-    ['간접비 합계', (estimate.totalManufacturingCost as number) - (estimate.totalDirectCost as number)],
-    ['', ''],
-    ['총제조원가', estimate.totalManufacturingCost as number],
-    ['판관비', estimate.sellingAdminCost as number],
-    ['총원가', estimate.totalExpense as number],
-    ['영업이익', estimate.operatingProfit as number],
-    ['이익률(%)', estimate.profitRate as number],
+
+  const infoData = [
+    ['항목', '내용'],
+    ['프로젝트명', (estimate['projectName'] as string) || ''],
+    ['제목', (estimate['title'] as string) || ''],
+    ['버전', (estimate['version'] as string) || ''],
+    ['계약금액', (estimate['contractAmount'] as number) || 0],
+    ['판관비율(%)', (estimate['sellingAdminRate'] as number) || 0],
   ]
-  
-  const sheet = XLSX.utils.aoa_to_sheet(data)
-  sheet['!cols'] = [{ wch: 20 }, { wch: 15 }]
-  XLSX.utils.book_append_sheet(wb, sheet, '견적원가내역')
-  
+  const infoSheet = XLSX.utils.aoa_to_sheet(infoData)
+  infoSheet['!cols'] = [{ wch: 20 }, { wch: 40 }]
+  XLSX.utils.book_append_sheet(wb, infoSheet, '기본정보')
+
+  const directData = [['항목', '금액']]
+  for (const field of DIRECT_COST_FIELDS) {
+    directData.push([field.label, (estimate[field.key] as number) || 0])
+  }
+  const directSheet = XLSX.utils.aoa_to_sheet(directData)
+  directSheet['!cols'] = [{ wch: 20 }, { wch: 20 }]
+  XLSX.utils.book_append_sheet(wb, directSheet, '직접비')
+
+  const indirectData = [['항목', '금액']]
+  for (const field of INDIRECT_COST_FIELDS) {
+    indirectData.push([field.label, (estimate[field.key] as number) || 0])
+  }
+  const indirectSheet = XLSX.utils.aoa_to_sheet(indirectData)
+  indirectSheet['!cols'] = [{ wch: 20 }, { wch: 20 }]
+  XLSX.utils.book_append_sheet(wb, indirectSheet, '간접비')
+
+  const summaryData = [
+    ['항목', '금액'],
+    ['직접비 합계', (estimate['totalDirectCost'] as number) || 0],
+    ['간접비 합계', (estimate['totalIndirectCost'] as number) || 0],
+    ['총제조원가', (estimate['totalManufacturingCost'] as number) || 0],
+    ['판관비', (estimate['sellingAdminCost'] as number) || 0],
+    ['매출총이익', (estimate['grossProfit'] as number) || 0],
+    ['영업이익', (estimate['operatingProfit'] as number) || 0],
+    ['이익률(%)', (estimate['profitRate'] as number) || 0],
+  ]
+  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
+  summarySheet['!cols'] = [{ wch: 20 }, { wch: 20 }]
+  XLSX.utils.book_append_sheet(wb, summarySheet, '요약')
+
   return wb
 }

@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { submitCostEstimate } from './actions'
+import { generateEstimateTemplate } from '@/lib/excel/estimate-template'
+import * as XLSX from 'xlsx'
 
 const DIRECT_ITEMS = [
   { key: 'materialCost', label: '재료비' },
@@ -46,13 +48,33 @@ export function CostEstimateForm({ projectId, projectName, id, existing }: CostE
   const statusVal = existing ? (existing.status as string) ?? 'DRAFT' : 'DRAFT'
 
   const downloadTemplate = () => {
-    alert('Excel 템플릿 다운로드는 준비 중입니다.')
+    const wb = generateEstimateTemplate(projectName)
+    XLSX.writeFile(wb, '견적원가_템플릿.xlsx')
   }
 
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setUploadMessage('📤 Excel 업로드는 준비 중입니다. 수동으로 입력해주세요.')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('projectId', projectId)
+
+      const res = await fetch('/api/cost-estimate/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const result = await res.json()
+      if (result.success && result.data) {
+        setUploadMessage('✓ Excel 파일을 성공적으로 불러왔습니다. 저장 버튼을 클릭하여 저장하세요.')
+      } else {
+        setUploadMessage('❌ Excel 파싱 실패: ' + (result.error || '알 수 없는 오류'))
+      }
+    } catch (err) {
+      setUploadMessage('❌ 업로드 오류: ' + String(err))
+    }
     setTimeout(() => setUploadMessage(null), 5000)
   }
 
