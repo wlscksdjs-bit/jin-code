@@ -182,3 +182,70 @@ export async function deleteCostExecution(id: string) {
   revalidatePath(`/projects/${execution.projectId}`)
   revalidatePath(`/cost/${execution.projectId}/execution`)
 }
+
+const COST_KEY_MAP: Record<string, string> = {
+  materialCost: '재료비',
+  laborCost: '노무비',
+  outsourceFabrication: '외주비(제작)',
+  outsourceService: '외주비(용역)',
+  consumableOther: '소모품/기타',
+  consumableSafety: '안전용품',
+  travelExpense: '여비교통비',
+  insuranceWarranty: '보험/보증',
+  dormitoryCost: '숙소비',
+  miscellaneous: '잡비',
+  paymentFeeOther: '지급수수료',
+  rentalForklift: '장비임대(지게차)',
+  rentalOther: '장비임대(기타)',
+  vehicleRepair: '차량수리비',
+  vehicleFuel: '차량유류비',
+  vehicleOther: '차량기타',
+  welfareBusiness: '복리후생',
+  reserveFund: '예비비',
+  indirectCost: '간접비',
+}
+
+export async function updateBudgetFromProject(projectId: string) {
+  const session = await auth()
+  if (!session) throw new Error('Unauthorized')
+
+  const executions = await prisma.costExecution.findMany({
+    where: { projectId },
+  })
+
+  const totals: Record<string, number> = {}
+  for (const key of COST_FIELDS) {
+    totals[key] = 0
+  }
+
+  for (const execution of executions) {
+    for (const key of COST_FIELDS) {
+      totals[key] += (execution as Record<string, number>)[key] || 0
+    }
+  }
+
+  const budgets = await prisma.budget.findMany({
+    where: { projectId },
+    include: { items: true },
+  })
+
+  for (const budget of budgets) {
+    for (const item of budget.items) {
+      const key = Object.entries(COST_KEY_MAP).find(([, name]) => name === item.name)?.[0]
+      if (key && totals[key] !== undefined) {
+        await prisma.budgetItem.update({
+          where: { id: item.id },
+          data: { actualAmount: totals[key] },
+        })
+      }
+    }
+
+    const totalActual = Object.values(totals).reduce((s, v) => s + v, 0)
+    await prisma.budget.update({
+      where: { id: budget.id },
+      data: { actualCost: totalActual },
+    })
+  }
+
+  revalidatePath(`/budget/${projectId}`)
+}

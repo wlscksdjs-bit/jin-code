@@ -175,3 +175,76 @@ export async function listCostCategories() {
   if (!session) throw new Error('Unauthorized')
   return prisma.costCategory.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } })
 }
+
+const BUDGET_ITEMS = [
+  { name: '재료비', key: 'materialCost', category: 'DIRECT' },
+  { name: '노무비', key: 'laborCost', category: 'DIRECT' },
+  { name: '외주비(제작)', key: 'outsourceFabrication', category: 'DIRECT' },
+  { name: '외주비(용역)', key: 'outsourceService', category: 'DIRECT' },
+  { name: '소모품/기타', key: 'consumableOther', category: 'INDIRECT' },
+  { name: '안전용품', key: 'consumableSafety', category: 'INDIRECT' },
+  { name: '여비교통비', key: 'travelExpense', category: 'INDIRECT' },
+  { name: '보험/보증', key: 'insuranceWarranty', category: 'INDIRECT' },
+  { name: '숙소비', key: 'dormitoryCost', category: 'INDIRECT' },
+  { name: '잡비', key: 'miscellaneous', category: 'INDIRECT' },
+  { name: '지급수수료', key: 'paymentFeeOther', category: 'INDIRECT' },
+  { name: '장비임대(지게차)', key: 'rentalForklift', category: 'INDIRECT' },
+  { name: '장비임대(기타)', key: 'rentalOther', category: 'INDIRECT' },
+  { name: '차량수리비', key: 'vehicleRepair', category: 'INDIRECT' },
+  { name: '차량유류비', key: 'vehicleFuel', category: 'INDIRECT' },
+  { name: '차량기타', key: 'vehicleOther', category: 'INDIRECT' },
+  { name: '복리후생', key: 'welfareBusiness', category: 'INDIRECT' },
+  { name: '예비비', key: 'reserveFund', category: 'INDIRECT' },
+  { name: '간접비', key: 'indirectCost', category: 'INDIRECT' },
+]
+
+export async function convertEstimateToBudget(estimateId: string) {
+  const session = await auth()
+  if (!session) throw new Error('Unauthorized')
+
+  const estimate = await prisma.costEstimate.findUnique({
+    where: { id: estimateId },
+    include: { project: true },
+  })
+  if (!estimate) throw new Error('Estimate not found')
+
+  const budget = await prisma.budget.create({
+    data: {
+      projectId: estimate.projectId,
+      type: 'INITIAL',
+      sourceType: 'ESTIMATE',
+      totalBudget: estimate.contractAmount,
+      materialCost: estimate.materialCost,
+      laborCost: estimate.laborCost,
+      outsourceCost: estimate.outsourceFabrication + estimate.outsourceService,
+      actualCost: 0,
+      sellingAdminCostRate: estimate.sellingAdminRate,
+      status: 'DRAFT',
+      effectiveDate: new Date(),
+      items: {
+        create: BUDGET_ITEMS.map((item, idx) => ({
+          name: item.name,
+          category: item.category,
+          plannedAmount: (estimate as Record<string, number>)[item.key] || 0,
+          actualAmount: 0,
+          sortOrder: idx,
+        })),
+      },
+    },
+    include: { items: true },
+  })
+
+  await prisma.project.update({
+    where: { id: estimate.projectId },
+    data: {
+      status: 'CONTRACT',
+      contractAmount: estimate.contractAmount,
+    },
+  })
+
+  revalidatePath(`/projects/${estimate.projectId}`)
+  revalidatePath(`/budget/${estimate.projectId}`)
+  revalidatePath(`/cost/${estimate.projectId}/estimate`)
+
+  return budget
+}
