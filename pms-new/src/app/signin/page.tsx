@@ -1,8 +1,6 @@
-import { handlers } from '@/lib/auth'
+import { signIn } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-
-const { signIn } = handlers
 
 export default async function SignInPage() {
   const session = await auth()
@@ -10,11 +8,18 @@ export default async function SignInPage() {
 
   async function handleSubmit(formData: FormData) {
     'use server'
-    await signIn('credentials', {
-      email: formData.get('email') as string,
-      password: formData.get('password') as string,
-      redirectTo: '/dashboard-page',
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+    
+    const result = await signIn('credentials', {
+      email,
+      password,
+      redirect: false,
     })
+    
+    if (result?.ok) {
+      redirect('/dashboard-page')
+    }
   }
 
   return (

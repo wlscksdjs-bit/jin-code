@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 
-const { handlers, signIn, signOut, auth } = NextAuth({
+const nextAuth = NextAuth({
   providers: [
     Credentials({
       credentials: {
@@ -36,8 +36,7 @@ const { handlers, signIn, signOut, auth } = NextAuth({
   },
 })
 
-export { handlers, signIn, signOut }
-export { auth }
+export const { handlers, signIn, signOut, auth } = nextAuth
 
 declare module 'next-auth' {
   interface Session {
