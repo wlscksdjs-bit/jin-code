@@ -1,11 +1,10 @@
 import { notFound } from 'next/navigation'
-import { getCostExecutionMonthlySummary, aggregateProjectDashboard } from '@/app/actions/dashboard'
+import { getCostExecutionMonthlySummary } from '@/app/actions/dashboard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
-export default async function MonthlyCostPage({ params }: { params: Promise<{ projectId: string }> }) {
+export default async function MonthlyCostPage({ params }: { params: Promise<{ projectId: string> }) {
   const { projectId } = await params
-  await aggregateProjectDashboard(projectId)
   const { rows, contractAmount } = await getCostExecutionMonthlySummary(projectId)
 
   const fmt = (n: number) => `${n.toLocaleString('ko-KR')}원`
