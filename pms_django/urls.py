@@ -8,6 +8,8 @@ urlpatterns = [
     path('api/projects/', include('projects.urls')),
     path('api/cost/', include('cost.urls')),
     path('api/approvals/', include('approvals.urls')),
+    path('api/resources/', include('resources.urls')),
+    path('api/schedule/', include('schedule.urls')),
     path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain'),
     path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
