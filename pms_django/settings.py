@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'approvals',
     'resources',
     'schedule',
+    'dashboard',
 ]
 
 MIDDLEWARE = [
