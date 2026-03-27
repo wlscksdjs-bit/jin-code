@@ -7,7 +7,8 @@ import { z } from 'zod'
 
 const salesSchema = z.object({
   type: z.string().default('BIDDING'),
-  status: z.string().default('DRAFT'),
+  status: z.string().default('WAITING'),
+  progress: z.number().default(0),
   title: z.string().min(1),
   bidNumber: z.string().optional(),
   bidAmount: z.number().default(0),
@@ -18,6 +19,11 @@ const salesSchema = z.object({
   contractAmount: z.number().default(0),
   customerId: z.string().optional(),
   managerId: z.string().optional(),
+  laborCost: z.number().default(0),
+  materialCost: z.number().default(0),
+  outsourceCost: z.number().default(0),
+  equipmentCost: z.number().default(0),
+  otherCost: z.number().default(0),
   description: z.string().optional(),
   notes: z.string().optional(),
 })
@@ -49,6 +55,7 @@ export async function createSales(data: z.infer<typeof salesSchema>) {
     data: {
       type: parsed.type,
       status: parsed.status,
+      progress: parsed.progress ?? 0,
       title: parsed.title,
       bidNumber: parsed.bidNumber,
       bidAmount: parsed.bidAmount,
@@ -59,6 +66,11 @@ export async function createSales(data: z.infer<typeof salesSchema>) {
       contractAmount: parsed.contractAmount,
       customerId: parsed.customerId,
       managerId: parsed.managerId,
+      laborCost: parsed.laborCost ?? 0,
+      materialCost: parsed.materialCost ?? 0,
+      outsourceCost: parsed.outsourceCost ?? 0,
+      equipmentCost: parsed.equipmentCost ?? 0,
+      otherCost: parsed.otherCost ?? 0,
       description: parsed.description,
       notes: parsed.notes,
     },

@@ -110,7 +110,8 @@ model ProjectMember {
 model Sales {
   id              String    @id @default(cuid())
   type            String    @default("BIDDING") // BIDDING, CONTRACT, CHANGE_ORDER
-  status          String    @default("DRAFT") // DRAFT, SUBMITTED, EVALUATING, WON, LOST, CANCELLED
+  status          String    @default("WAITING") // WAITING, IN_PROGRESS, COMPLETED, DRAFT, SUBMITTED, EVALUATING, WON, LOST, CANCELLED
+  progress        Int       @default(0) // 진행사항 (%)
   title           String
   bidNumber       String?
   bidAmount       Float     @default(0)
@@ -121,11 +122,11 @@ model Sales {
   contractAmount  Float     @default(0)
   customerBudget  Float?
   competitorInfo  String?
-  laborCost       Float     @default(0)
-  materialCost    Float     @default(0)
-  outsourceCost   Float     @default(0)
-  equipmentCost   Float     @default(0)
-  otherCost       Float     @default(0)
+  laborCost       Float     @default(0)      // 인건비
+  materialCost    Float     @default(0)     // 자재비
+  outsourceCost   Float     @default(0)     // 외주비
+  equipmentCost   Float     @default(0)     // 설비비
+  otherCost       Float     @default(0)     // 기타
   executionCost   Float     @default(0)
   bidResult       String?
   resultDate      DateTime?
