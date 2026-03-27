@@ -4,7 +4,7 @@ from .models import ResourceAllocation, ResourceConflict
 
 class ResourceAllocationSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
-    project_name = serializers.CharField source('project.name', read_only=True)
+    project_name = serializers.CharField(source='project.name', read_only=True)
     role_display = serializers.CharField(source='get_role_display', read_only=True)
     duration_days = serializers.IntegerField(read_only=True)
     duration_months = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True)
