@@ -92,7 +92,7 @@ export const SchedulePage: React.FC = () => {
             <div className="min-w-[800px] p-4">
               {ganttData.length > 0 ? (
                 <div className="relative">
-                  {ganttData.map((task, idx) => {
+                  {ganttData.map((task) => {
                     const start = new Date(task.start).getTime();
                     const end = new Date(task.end).getTime();
                     const totalDays = 365;
