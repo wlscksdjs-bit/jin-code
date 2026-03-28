@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { scheduleApi, projectApi } from '../services/api';
-import type { Task, GanttTask, Project, User } from '../types';
+import type { Task, GanttTask, Project } from '../types';
 
 export const SchedulePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +31,8 @@ export const SchedulePage: React.FC = () => {
     } catch (error) {
       console.error('Failed to load schedule:', error);
     } finally {
-      setIsLoading(false    }
+      setIsLoading(false);
+    }
   };
 
   const handleCreateTask = async (data: { project: number; parent?: number; name: string; description?: string; start_date: string; end_date: string; assignee?: number; is_milestone?: boolean }) => {
