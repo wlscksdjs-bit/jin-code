@@ -10,6 +10,7 @@ export interface User {
   phone: string;
   position: string;
   date_joined: string;
+  can_approve?: boolean;
 }
 
 export interface Project {
@@ -106,4 +107,118 @@ export interface Expense {
   approved_by: number | null;
   approved_by_name: string | null;
   created_at: string;
+}
+
+export interface ApprovalType {
+  id: number;
+  name: string;
+  code: string;
+  description: string;
+  requires_expense: boolean;
+}
+
+export interface Approval {
+  id: number;
+  project: number;
+  project_name: string;
+  approval_type: number;
+  approval_type_name: string;
+  title: string;
+  content: string;
+  amount: string | null;
+  status: 'draft' | 'pending' | 'approved' | 'rejected' | 'cancelled';
+  requester: number;
+  requester_name: string;
+  current_approver: number | null;
+  current_approver_name: string | null;
+  current_step: number;
+  submitted_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  steps?: ApprovalStep[];
+  actions?: ApprovalAction[];
+}
+
+export interface ApprovalStep {
+  id: number;
+  order: number;
+  approver: number;
+  approver_name: string;
+  status: 'pending' | 'approved' | 'rejected';
+  comment: string;
+  acted_at: string | null;
+}
+
+export interface ApprovalAction {
+  id: number;
+  approver: number;
+  approver_name: string;
+  action: 'approve' | 'reject';
+  comment: string;
+  created_at: string;
+}
+
+export interface ResourceAllocation {
+  id: number;
+  project: number;
+  project_name: string;
+  user: number;
+  user_name: string;
+  role: 'pm' | 'designer' | 'constructor' | 'engineer' | 'assistant';
+  role_display: string;
+  start_date: string;
+  end_date: string;
+  allocation_rate: number;
+  hours_per_month: string | null;
+  description: string;
+  duration_days: number;
+  duration_months: number;
+  created_at: string;
+}
+
+export interface ResourceConflict {
+  id: number;
+  user: number;
+  user_name: string;
+  start_date: string;
+  end_date: string;
+  total_allocation_rate: number;
+  is_resolved: boolean;
+  allocations?: ResourceAllocation[];
+}
+
+export interface Task {
+  id: number;
+  project: number;
+  project_name: string;
+  parent: number | null;
+  parent_name: string | null;
+  name: string;
+  description: string;
+  start_date: string;
+  end_date: string;
+  progress: number;
+  status: 'pending' | 'in_progress' | 'completed' | 'delayed' | 'cancelled';
+  status_display: string;
+  assignee: number | null;
+  assignee_name: string | null;
+  order: number;
+  is_milestone: boolean;
+  is_delayed: boolean;
+  duration_days: number;
+  subtasks?: Task[];
+  dependencies?: { id: number; predecessor_name: string; dependency_type: string }[];
+  created_at: string;
+}
+
+export interface GanttTask {
+  id: number;
+  name: string;
+  start: string;
+  end: string;
+  progress: number;
+  dependencies: { taskId: number; type: string }[];
+  assignee_name: string | null;
+  is_milestone: boolean;
+  status: string;
 }

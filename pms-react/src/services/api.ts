@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { AuthTokens, User, BidSimulation, Project, ProjectVersion, CostCategory, Vendor, Budget, Expense } from '../types';
+import type { AuthTokens, User, BidSimulation, Project, ProjectVersion, CostCategory, Vendor, Budget, Expense, Approval, ApprovalType, ResourceAllocation, ResourceConflict, Task, GanttTask } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -150,6 +150,125 @@ export const costApi = {
 
   rejectExpense: async (id: number) => {
     const res = await api.post(`/cost/expenses/${id}/reject/`);
+    return res.data;
+  },
+};
+
+export const approvalApi = {
+  getApprovalTypes: async (): Promise<ApprovalType[]> => {
+    const res = await api.get('/approvals/types/');
+    return res.data.results || res.data;
+  },
+
+  getApprovals: async (): Promise<Approval[]> => {
+    const res = await api.get('/approvals/');
+    return res.data.results || res.data;
+  },
+
+  getApproval: async (id: number): Promise<Approval> => {
+    const res = await api.get(`/approvals/${id}/`);
+    return res.data;
+  },
+
+  createApproval: async (data: { project: number; approval_type: number; title: string; content: string; amount?: string; approvers: number[] }) => {
+    const res = await api.post('/approvals/', data);
+    return res.data;
+  },
+
+  submitApproval: async (id: number) => {
+    const res = await api.post(`/approvals/${id}/submit/`);
+    return res.data;
+  },
+
+  approveApproval: async (id: number, comment?: string) => {
+    const res = await api.post(`/approvals/${id}/approve/`, { comment });
+    return res.data;
+  },
+
+  rejectApproval: async (id: number, comment: string) => {
+    const res = await api.post(`/approvals/${id}/reject/`, { comment });
+    return res.data;
+  },
+
+  getPendingApprovals: async (): Promise<Approval[]> => {
+    const res = await api.get('/approvals/pending/');
+    return res.data;
+  },
+};
+
+export const resourceApi = {
+  getAllocations: async (projectId?: number, userId?: number): Promise<ResourceAllocation[]> => {
+    let url = '/resources/';
+    const params = new URLSearchParams();
+    if (projectId) params.append('project', String(projectId));
+    if (userId) params.append('user', String(userId));
+    if (params.toString()) url += '?' + params.toString();
+    const res = await api.get(url);
+    return res.data.results || res.data;
+  },
+
+  createAllocation: async (data: { project: number; user: number; role: string; start_date: string; end_date: string; allocation_rate: number; description?: string }) => {
+    const res = await api.post('/resources/', data);
+    return res.data;
+  },
+
+  updateAllocation: async (id: number, data: Partial<ResourceAllocation>) => {
+    const res = await api.patch(`/resources/${id}/`, data);
+    return res.data;
+  },
+
+  deleteAllocation: async (id: number) => {
+    await api.delete(`/resources/${id}/`);
+  },
+
+  getConflicts: async (): Promise<ResourceConflict[]> => {
+    const res = await api.get('/resources/conflicts/');
+    return res.data;
+  },
+
+  checkConflicts: async (userId: number, startDate: string, endDate: string, allocationRate: number) => {
+    const res = await api.get(`/resources/check_conflicts/?user_id=${userId}&start_date=${startDate}&end_date=${endDate}&allocation_rate=${allocationRate}`);
+    return res.data;
+  },
+
+  getHeatmap: async (year: number, month: number): Promise<{ user_id: number; user_name: string; total_rate: number; projects: { project_name: string; rate: number }[] }[]> => {
+    const res = await api.get(`/resources/heatmap/?year=${year}&month=${month}`);
+    return res.data;
+  },
+};
+
+export const scheduleApi = {
+  getTasks: async (projectId: number): Promise<Task[]> => {
+    const res = await api.get(`/schedule/tasks/?project=${projectId}`);
+    return res.data.results || res.data;
+  },
+
+  createTask: async (data: { project: number; parent?: number; name: string; description?: string; start_date: string; end_date: string; assignee?: number; order?: number; is_milestone?: boolean }) => {
+    const res = await api.post('/schedule/tasks/', data);
+    return res.data;
+  },
+
+  updateTask: async (id: number, data: Partial<Task>) => {
+    const res = await api.patch(`/schedule/tasks/${id}/`, data);
+    return res.data;
+  },
+
+  deleteTask: async (id: number) => {
+    await api.delete(`/schedule/tasks/${id}/`);
+  },
+
+  updateProgress: async (id: number, progress: number) => {
+    const res = await api.post(`/schedule/tasks/${id}/update_progress/`, { progress });
+    return res.data;
+  },
+
+  getGanttData: async (projectId: number): Promise<GanttTask[]> => {
+    const res = await api.get(`/schedule/tasks/gantt/?project=${projectId}`);
+    return res.data;
+  },
+
+  getDelayedTasks: async (): Promise<Task[]> => {
+    const res = await api.get('/schedule/tasks/delayed/');
     return res.data;
   },
 };

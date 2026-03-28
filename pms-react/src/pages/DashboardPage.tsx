@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { projectApi } from '../services/api';
 import type { Project } from '../types';
@@ -71,6 +71,7 @@ export const DashboardPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">PMS 대시보드</h1>
           <div className="flex items-center gap-4">
+            <Link to="/approvals" className="text-sm text-blue-600 hover:text-blue-800">전자 결재</Link>
             <span className="text-sm text-gray-600">{user?.first_name}{user?.last_name} ({user?.role})</span>
             <button onClick={logout} className="text-sm text-red-600 hover:text-red-800">로그아웃</button>
           </div>
