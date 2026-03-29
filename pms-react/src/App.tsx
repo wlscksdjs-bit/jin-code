@@ -7,6 +7,7 @@ import { ApprovalPage } from './pages/ApprovalPage';
 import { ResourcePage } from './pages/ResourcePage';
 import { SchedulePage } from './pages/SchedulePage';
 import { CostSpreadsheetPage } from './pages/CostSpreadsheetPage';
+import { UserManagementPage } from './pages/UserManagementPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading } = useAuth();
@@ -71,6 +72,14 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <CostSpreadsheetPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute>
+            <UserManagementPage />
           </ProtectedRoute>
         }
       />

@@ -118,6 +118,9 @@ export const DashboardPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">PMS 대시보드</h1>
           <div className="flex items-center gap-4">
+            {user?.role === 'admin' && (
+              <Link to="/users" className="text-sm text-blue-600 hover:text-blue-800">사용자 관리</Link>
+            )}
             <Link to="/cost-spreadsheet" className="text-sm text-blue-600 hover:text-blue-800">원가 스프레드</Link>
             <Link to="/resources" className="text-sm text-blue-600 hover:text-blue-800">인력 관리</Link>
             <Link to="/approvals" className="text-sm text-blue-600 hover:text-blue-800">전자 결재</Link>
