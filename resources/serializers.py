@@ -4,17 +4,21 @@ from .models import ResourceAllocation, ResourceConflict
 
 class ResourceAllocationSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
     project_name = serializers.CharField(source='project.name', read_only=True)
     role_display = serializers.CharField(source='get_role_display', read_only=True)
     duration_days = serializers.IntegerField(read_only=True)
     duration_months = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True)
+    assigned_name = serializers.CharField(read_only=True)
+    assigned_type = serializers.CharField(read_only=True)
 
     class Meta:
         model = ResourceAllocation
         fields = [
-            'id', 'project', 'project_name', 'user', 'user_name', 'role', 'role_display',
-            'start_date', 'end_date', 'allocation_rate', 'hours_per_month', 'description',
-            'duration_days', 'duration_months', 'created_at', 'updated_at'
+            'id', 'project', 'project_name', 'user', 'user_name', 'vendor', 'vendor_name',
+            'role', 'role_display', 'start_date', 'end_date', 'allocation_rate',
+            'hours_per_month', 'description', 'duration_days', 'duration_months',
+            'assigned_name', 'assigned_type', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
@@ -23,7 +27,14 @@ class ResourceAllocationSerializer(serializers.ModelSerializer):
         self._check_conflicts(allocation)
         return allocation
 
+    def validate(self, data):
+        if not data.get('user') and not data.get('vendor'):
+            raise serializers.ValidationError('직원 또는 협력사를 최소 하나 이상 선택해야 합니다.')
+        return data
+
     def _check_conflicts(self, allocation):
+        if not allocation.user:
+            return
         conflicts = ResourceAllocation.objects.filter(
             user=allocation.user,
             start_date__lte=allocation.end_date,
