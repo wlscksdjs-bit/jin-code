@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { resourceApi, projectApi } from '../services/api';
-import type { ResourceAllocation, ResourceConflict, Project, User } from '../types';
+import type { ResourceAllocation, ResourceConflict, Project, User, Vendor } from '../types';
 
 export const ResourcePage: React.FC = () => {
   const navigate = useNavigate();
   const [allocations, setAllocations] = useState<ResourceAllocation[]>([]);
   const [conflicts, setConflicts] = useState<ResourceConflict[]>([]);
-  const [heatmap, setHeatmap] = useState<{ user_id: number; user_name: string; total_rate: number; projects: { project_name: string; rate: number }[] }[]>([]);
+  const [heatmap, setHeatmap] = useState<{ id: number; name: string; type: 'internal' | 'external'; total_rate: number; projects: { project_name: string; rate: number }[] }[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'list' | 'heatmap' | 'conflicts'>('list');
   const [showModal, setShowModal] = useState(false);
@@ -22,16 +23,18 @@ export const ResourcePage: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [allocs, confs, projs, usersData] = await Promise.all([
+      const [allocs, confs, projs, usersData, vendorsData] = await Promise.all([
         resourceApi.getAllocations(),
         resourceApi.getConflicts(),
         projectApi.getProjects(),
         fetchUsers(),
+        fetchVendors(),
       ]);
       setAllocations(allocs);
       setConflicts(confs);
       setProjects((projs.results || projs).filter((p: Project) => p.status !== 'completed' && p.status !== 'cancelled'));
       setUsers(usersData);
+      setVendors(vendorsData);
       
       const heatmapData = await resourceApi.getHeatmap(selectedYear, selectedMonth);
       setHeatmap(heatmapData);
@@ -50,7 +53,15 @@ export const ResourcePage: React.FC = () => {
     return data.results || data;
   };
 
-  const handleCreateAllocation = async (data: { project: number; user: number; role: string; start_date: string; end_date: string; allocation_rate: number; description: string }) => {
+  const fetchVendors = async (): Promise<Vendor[]> => {
+    const res = await fetch('/api/cost/vendors/', {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+    });
+    const data = await res.json();
+    return data.results || data;
+  };
+
+  const handleCreateAllocation = async (data: { project: number; user?: number; vendor?: number; role: string; start_date: string; end_date: string; allocation_rate: number; description: string }) => {
     try {
       await resourceApi.createAllocation(data);
       setShowModal(false);
@@ -127,7 +138,14 @@ export const ResourcePage: React.FC = () => {
                 {allocations.map((alloc) => (
                   <tr key={alloc.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm font-medium">{alloc.project_name}</td>
-                    <td className="px-6 py-4 text-sm">{alloc.user_name}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span>{alloc.assigned_name}</span>
+                        <span className={`px-1.5 py-0.5 text-xs rounded ${alloc.assigned_type === 'external' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+                          {alloc.assigned_type === 'external' ? '외주' : '사원'}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadge(alloc.role).bg} ${getRoleBadge(alloc.role).text}`}>
                         {alloc.role_display}
@@ -171,8 +189,15 @@ export const ResourcePage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {heatmap.map((item) => (
-                    <tr key={item.user_id}>
-                      <td className="px-6 py-4 text-sm font-medium">{item.user_name}</td>
+                    <tr key={item.id}>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{item.name}</span>
+                          <span className={`px-1.5 py-0.5 text-xs rounded ${item.type === 'external' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+                            {item.type === 'external' ? '외주' : '사원'}
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-sm text-right">
                         <span className={`font-bold ${item.total_rate > 100 ? 'text-red-600' : item.total_rate > 80 ? 'text-yellow-600' : 'text-green-600'}`}>
                           {item.total_rate}%
@@ -230,7 +255,7 @@ export const ResourcePage: React.FC = () => {
       </div>
 
       {showModal && (
-        <AllocationModal projects={projects} users={users} onClose={() => setShowModal(false)} onSubmit={handleCreateAllocation} />
+        <AllocationModal projects={projects} users={users} vendors={vendors} onClose={() => setShowModal(false)} onSubmit={handleCreateAllocation} />
       )}
     </div>
   );
@@ -239,11 +264,14 @@ export const ResourcePage: React.FC = () => {
 const AllocationModal: React.FC<{
   projects: Project[];
   users: User[];
+  vendors: Vendor[];
   onClose: () => void;
-  onSubmit: (data: { project: number; user: number; role: string; start_date: string; end_date: string; allocation_rate: number; description: string }) => void;
-}> = ({ projects, users, onClose, onSubmit }) => {
+  onSubmit: (data: { project: number; user?: number; vendor?: number; role: string; start_date: string; end_date: string; allocation_rate: number; description: string }) => void;
+}> = ({ projects, users, vendors, onClose, onSubmit }) => {
   const [project, setProject] = useState('');
   const [user, setUser] = useState('');
+  const [vendor, setVendor] = useState('');
+  const [assignedType, setAssignedType] = useState<'internal' | 'external'>('internal');
   const [role, setRole] = useState('pm');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -252,10 +280,12 @@ const AllocationModal: React.FC<{
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && startDate && endDate && Number(allocationRate) > 0) {
+    if (assignedType === 'internal' && user && startDate && endDate && Number(allocationRate) > 0) {
       checkConflicts();
+    } else {
+      setConflictWarning(null);
     }
-  }, [user, startDate, endDate, allocationRate]);
+  }, [user, startDate, endDate, allocationRate, assignedType]);
 
   const checkConflicts = async () => {
     try {
@@ -275,9 +305,14 @@ const AllocationModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user && !vendor) {
+      alert('직원 또는 협력사를 최소 하나 이상 선택해주세요.');
+      return;
+    }
     onSubmit({
       project: Number(project),
-      user: Number(user),
+      user: assignedType === 'internal' && user ? Number(user) : undefined,
+      vendor: assignedType === 'external' && vendor ? Number(vendor) : undefined,
       role,
       start_date: startDate,
       end_date: endDate,
@@ -304,12 +339,35 @@ const AllocationModal: React.FC<{
             </select>
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">담당자</label>
-            <select value={user} onChange={(e) => setUser(e.target.value)} className="w-full px-3 py-2 border rounded-md" required>
+            <label className="block text-sm font-medium text-gray-700 mb-1">배정 유형</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2">
+                <input type="radio" name="assignedType" checked={assignedType === 'internal'} onChange={() => setAssignedType('internal')} />
+                <span className="text-sm">직원</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" name="assignedType" checked={assignedType === 'external'} onChange={() => setAssignedType('external')} />
+                <span className="text-sm">협력사</span>
+              </label>
+            </div>
+          </div>
+          {assignedType === 'internal' ? (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">담당자 (직원)</label>
+            <select value={user} onChange={(e) => setUser(e.target.value)} className="w-full px-3 py-2 border rounded-md">
               <option value="">선택</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>)}
             </select>
           </div>
+          ) : (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">협력사</label>
+            <select value={vendor} onChange={(e) => setVendor(e.target.value)} className="w-full px-3 py-2 border rounded-md">
+              <option value="">선택</option>
+              {vendors.filter(v => v.is_active).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          </div>
+          )}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">역할</label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3 py-2 border rounded-md">

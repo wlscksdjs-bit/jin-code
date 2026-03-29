@@ -84,7 +84,8 @@ export const projectApi = {
   },
 
   deleteProject: async (id: number) => {
-    await api.delete(`/projects/projects/${id}/`);
+    const res = await api.delete(`/projects/projects/${id}/`);
+    return res.data;
   },
 
   createVersion: async (projectId: number, data: Partial<ProjectVersion>) => {
@@ -207,7 +208,7 @@ export const resourceApi = {
     return res.data.results || res.data;
   },
 
-  createAllocation: async (data: { project: number; user: number; role: string; start_date: string; end_date: string; allocation_rate: number; description?: string }) => {
+  createAllocation: async (data: { project: number; user?: number; vendor?: number; role: string; start_date: string; end_date: string; allocation_rate: number; description?: string }) => {
     const res = await api.post('/resources/', data);
     return res.data;
   },
@@ -231,7 +232,7 @@ export const resourceApi = {
     return res.data;
   },
 
-  getHeatmap: async (year: number, month: number): Promise<{ user_id: number; user_name: string; total_rate: number; projects: { project_name: string; rate: number }[] }[]> => {
+  getHeatmap: async (year: number, month: number): Promise<{ id: number; name: string; type: 'internal' | 'external'; total_rate: number; projects: { project_name: string; rate: number }[] }[]> => {
     const res = await api.get(`/resources/heatmap/?year=${year}&month=${month}`);
     return res.data;
   },

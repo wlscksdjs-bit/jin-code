@@ -162,8 +162,10 @@ export interface ResourceAllocation {
   id: number;
   project: number;
   project_name: string;
-  user: number;
+  user: number | null;
   user_name: string;
+  vendor: number | null;
+  vendor_name: string;
   role: 'pm' | 'designer' | 'constructor' | 'engineer' | 'assistant';
   role_display: string;
   start_date: string;
@@ -173,6 +175,8 @@ export interface ResourceAllocation {
   description: string;
   duration_days: number;
   duration_months: number;
+  assigned_name: string;
+  assigned_type: 'internal' | 'external';
   created_at: string;
 }
 

@@ -44,6 +44,75 @@ class BudgetViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    @action(detail=False, methods=['get'])
+    def matrix(self, request):
+        from projects.models import Project
+        from django.db.models import Sum
+        
+        projects = Project.objects.filter(status__in=['planning', 'in_progress']).order_by('-created_at')[:10]
+        categories = CostCategory.objects.filter(is_active=True).order_by('category_type', 'name')
+        
+        matrix_data = []
+        
+        for category in categories:
+            row = {
+                'category_id': category.id,
+                'category_name': category.name,
+                'category_type': category.category_type,
+                'category_type_display': category.get_category_type_display(),
+            }
+            
+            for project in projects:
+                budget = Budget.objects.filter(project=project, category=category).first()
+                if budget:
+                    expenses = budget.expenses.filter(status='approved')
+                    used = expenses.aggregate(total=Sum('amount'))['total'] or 0
+                    pending = budget.expenses.filter(status='pending').aggregate(total=Sum('amount'))['total'] or 0
+                    remaining = float(budget.planned_amount) - float(used) - float(pending)
+                    
+                    row[f'project_{project.id}'] = {
+                        'budget_id': budget.id,
+                        'planned': float(budget.planned_amount),
+                        'used': float(used),
+                        'pending': float(pending),
+                        'remaining': remaining,
+                        'status': 'overrun' if remaining < 0 else 'warning' if remaining < float(budget.planned_amount) * 0.2 else 'ok'
+                    }
+                else:
+                    row[f'project_{project.id}'] = None
+            
+            matrix_data.append(row)
+        
+        project_summaries = []
+        for project in projects:
+            budgets = Budget.objects.filter(project=project)
+            total_planned = sum(float(b.planned_amount) for b in budgets)
+            total_used = sum(
+                budget.expenses.filter(status='approved').aggregate(total=Sum('amount'))['total'] or 0 
+                for budget in budgets
+            )
+            total_pending = sum(
+                budget.expenses.filter(status='pending').aggregate(total=Sum('amount'))['total'] or 0 
+                for budget in budgets
+            )
+            
+            project_summaries.append({
+                'project_id': project.id,
+                'project_name': project.name,
+                'client': project.client,
+                'status': project.status,
+                'total_planned': total_planned,
+                'total_used': total_used,
+                'total_pending': total_pending,
+                'total_remaining': total_planned - total_used - total_pending,
+            })
+        
+        return Response({
+            'categories': [{'id': c.id, 'name': c.name, 'type': c.category_type, 'type_display': c.get_category_type_display()} for c in categories],
+            'projects': project_summaries,
+            'matrix': matrix_data,
+        })
+
     @action(detail=True, methods=['get'])
     def summary(self, request, pk=None):
         budget = self.get_object()

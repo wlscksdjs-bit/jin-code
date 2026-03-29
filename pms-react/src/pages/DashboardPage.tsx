@@ -10,6 +10,10 @@ export const DashboardPage: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [deleteProject, setDeleteProject] = useState<Project | null>(null);
+  const [deleteStep, setDeleteStep] = useState(0);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formData, setFormData] = useState<{
     name: string;
     client: string;
@@ -53,6 +57,49 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  const handleDeleteClick = (project: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteProject(project);
+    setDeleteStep(1);
+    setDeleteConfirmText('');
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteProject) return;
+    
+    if (deleteStep === 1) {
+      setDeleteStep(2);
+      return;
+    }
+    
+    if (deleteStep === 2) {
+      if (deleteConfirmText !== deleteProject.name) {
+        alert('프로젝트 이름이 일치하지 않습니다.');
+        return;
+      }
+      
+      setIsDeleting(true);
+      try {
+        await projectApi.deleteProject(deleteProject.id);
+        setDeleteProject(null);
+        setDeleteStep(0);
+        setDeleteConfirmText('');
+        loadProjects();
+      } catch (error) {
+        console.error('Failed to delete project:', error);
+        alert('삭제 실패: ' + (error as any)?.response?.data?.error || '알 수 없는 오류');
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteProject(null);
+    setDeleteStep(0);
+    setDeleteConfirmText('');
+  };
+
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { bg: string; text: string }> = {
       waiting: { bg: 'bg-gray-100', text: 'text-gray-800' },
@@ -71,6 +118,7 @@ export const DashboardPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">PMS 대시보드</h1>
           <div className="flex items-center gap-4">
+            <Link to="/cost-spreadsheet" className="text-sm text-blue-600 hover:text-blue-800">원가 스프레드</Link>
             <Link to="/resources" className="text-sm text-blue-600 hover:text-blue-800">인력 관리</Link>
             <Link to="/approvals" className="text-sm text-blue-600 hover:text-blue-800">전자 결재</Link>
             <span className="text-sm text-gray-600">{user?.first_name}{user?.last_name} ({user?.role})</span>
@@ -104,16 +152,27 @@ export const DashboardPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">기간</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">버전</th>
+                  {user?.role === 'admin' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">관리</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {projects.map((project) => (
-                  <tr key={project.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/projects/${project.id}`)}>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{project.name}</td>
+                  <tr key={project.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900 cursor-pointer" onClick={() => navigate(`/projects/${project.id}`)}>{project.name}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{project.client}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{project.start_date} ~ {project.end_date}</td>
                     <td className="px-6 py-4">{getStatusBadge(project.status)}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{project.latest_version_number || '-'}</td>
+                    {user?.role === 'admin' && (
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={(e) => handleDeleteClick(project, e)}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        >
+                          삭제
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -154,6 +213,82 @@ export const DashboardPage: React.FC = () => {
                 <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">생성</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            {deleteStep === 1 && (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">프로젝트 삭제</h3>
+                    <p className="text-sm text-gray-500">삭제 전 최종 확인</p>
+                  </div>
+                </div>
+                
+                <div className="mb-4 p-3 bg-red-50 rounded-md">
+                  <p className="text-sm text-red-800">
+                    <strong>"{deleteProject.name}"</strong> 프로젝트를 삭제하시겠습니까?
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
+                    ⚠️ 이 작업은 되돌릴 수 없습니다.
+                  </p>
+                </div>
+                
+                <div className="flex justify-end gap-2">
+                  <button onClick={closeDeleteModal} className="px-4 py-2 border rounded-md hover:bg-gray-50">취소</button>
+                  <button onClick={handleDeleteConfirm} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">삭제 진행</button>
+                </div>
+              </>
+            )}
+
+            {deleteStep === 2 && (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">2차 확인</h3>
+                    <p className="text-sm text-gray-500">프로젝트 이름 입력</p>
+                  </div>
+                </div>
+                
+                <div className="mb-4">
+                  <p className="text-sm text-gray-600 mb-2">
+                   삭제를 확인하려면 프로젝트 이름 <strong>"{deleteProject.name}"</strong>을(를) 아래에 입력하세요.
+                  </p>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="프로젝트 이름 입력"
+                    className="w-full px-3 py-2 border border-red-300 rounded-md focus:ring-red-500 focus:border-red-500"
+                  />
+                </div>
+                
+                <div className="flex justify-end gap-2">
+                  <button onClick={closeDeleteModal} className="px-4 py-2 border rounded-md hover:bg-gray-50" disabled={isDeleting}>취소</button>
+                  <button 
+                    onClick={handleDeleteConfirm} 
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                    disabled={isDeleting || deleteConfirmText !== deleteProject.name}
+                  >
+                    {isDeleting ? '삭제 중...' : '삭제 확인'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

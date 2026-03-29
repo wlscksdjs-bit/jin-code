@@ -133,8 +133,16 @@ export const ProjectDetailPage: React.FC = () => {
             <h1 className="text-xl font-bold text-gray-800">{project.name}</h1>
             {getStatusBadge(project.status)}
           </div>
-          <div className="text-sm text-gray-500">
-            고객사: {project.client} | 기간: {project.start_date} ~ {project.end_date}
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-500">
+              고객사: {project.client} | 기간: {project.start_date} ~ {project.end_date}
+            </div>
+            <button 
+              onClick={() => navigate(`/projects/${id}/schedule`)}
+              className="px-3 py-1 text-sm text-blue-600 border border-blue-600 rounded hover:bg-blue-50"
+            >
+              일정 관리
+            </button>
           </div>
         </div>
       </header>
