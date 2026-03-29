@@ -5,6 +5,7 @@ import { computeSalesCost } from '@/lib/sales-utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 
 const STATUS_LABELS: Record<string, string> = {
   WAITING: '대기', IN_PROGRESS: '진행', COMPLETED: '완료',
@@ -19,6 +20,10 @@ export default async function SalesPage() {
   if (!session) return null
 
   const allSales = await listSales()
+
+  const waitingCount = allSales.filter(x => ['WAITING', 'IN_PROGRESS', 'COMPLETED', 'DRAFT', 'SUBMITTED', 'EVALUATING'].includes(x.status)).length
+  const wonCount = allSales.filter(x => x.status === 'WON').length
+  const lostCount = allSales.filter(x => x.status === 'LOST').length
 
   const fmt = (n: number) => `${n.toLocaleString('ko-KR')}원`
   const fmtPct = (n: number) => `${n.toFixed(1)}%`
@@ -44,6 +49,21 @@ export default async function SalesPage() {
           <p className="text-sm text-gray-500 dark:text-gray-400">{allSales.length}건</p>
         </div>
         <Link href="/sales/new"><Button>새 영업</Button></Link>
+      </div>
+
+      <div className="flex gap-1 border-b">
+        <Link
+          href="/sales"
+          className="px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600"
+        >
+          영업목록
+        </Link>
+        <Link
+          href="/sales/waiting"
+          className="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700"
+        >
+          대기 프로젝트 ({waitingCount})
+        </Link>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
