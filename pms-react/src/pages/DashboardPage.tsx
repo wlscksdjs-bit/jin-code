@@ -121,6 +121,7 @@ export const DashboardPage: React.FC = () => {
             {user?.role === 'admin' && (
               <Link to="/users" className="text-sm text-blue-600 hover:text-blue-800">사용자 관리</Link>
             )}
+            <Link to="/monthly-cost" className="text-sm text-blue-600 hover:text-blue-800">월별 원가</Link>
             <Link to="/cost-spreadsheet" className="text-sm text-blue-600 hover:text-blue-800">원가 스프레드</Link>
             <Link to="/resources" className="text-sm text-blue-600 hover:text-blue-800">인력 관리</Link>
             <Link to="/approvals" className="text-sm text-blue-600 hover:text-blue-800">전자 결재</Link>
