@@ -72,15 +72,25 @@ class ResourceAllocationViewSet(viewsets.ModelViewSet):
             start_date__lte=end_date,
             end_date__gte=start_date,
             project__status__in=['planning', 'in_progress']
-        ).select_related('project', 'user')
+        ).select_related('project', 'user', 'vendor')
 
         heatmap_data = {}
+        
         for allocation in allocations:
-            key = allocation.user.id
+            if allocation.user:
+                key = f"user_{allocation.user.id}"
+                name = allocation.user.get_full_name() or allocation.user.username
+            elif allocation.vendor:
+                key = f"vendor_{allocation.vendor.id}"
+                name = allocation.vendor.name
+            else:
+                continue
+                
             if key not in heatmap_data:
                 heatmap_data[key] = {
-                    'user_id': allocation.user.id,
-                    'user_name': allocation.user.get_full_name(),
+                    'id': allocation.user.id if allocation.user else allocation.vendor.id,
+                    'name': name,
+                    'type': 'internal' if allocation.user else 'external',
                     'total_rate': 0,
                     'projects': []
                 }
