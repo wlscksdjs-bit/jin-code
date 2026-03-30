@@ -85,6 +85,7 @@ export function exportProjects(projects: Project[]): Buffer {
 
   const ws = XLSX.utils.json_to_sheet(data)
   ws['!cols'] = [{ wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 }]
+  ws['!freeze'] = { top: 1 }
 
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '프로젝트 목록')
@@ -152,6 +153,7 @@ export function exportCostExecution(execution: CostExecution): Buffer {
 
   const wsSummary = XLSX.utils.json_to_sheet(summaryData)
   wsSummary['!cols'] = [{ wch: 20 }, { wch: 40 }]
+  wsSummary['!freeze'] = { top: 1 }
 
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, wsSummary, '요약')
@@ -202,12 +204,14 @@ export function exportCashFlow(cashFlows: CashFlow[]): Buffer {
   if (inflowData.length > 0) {
     const wsInflow = XLSX.utils.json_to_sheet(inflowData)
     wsInflow['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 20 }]
+    wsInflow['!freeze'] = { top: 1 }
     XLSX.utils.book_append_sheet(wb, wsInflow, '수입')
   }
 
   if (outflowData.length > 0) {
     const wsOutflow = XLSX.utils.json_to_sheet(outflowData)
     wsOutflow['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 20 }]
+    wsOutflow['!freeze'] = { top: 1 }
     XLSX.utils.book_append_sheet(wb, wsOutflow, '지출')
   }
 
