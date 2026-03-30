@@ -12,6 +12,9 @@ import {
   Bell,
   LogOut,
   TrendingUp,
+  Clock,
+  UserCog,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -27,6 +30,9 @@ const navItems = [
   { href: '/orders', label: '발주관리', icon: ShoppingCart },
   { href: '/receipts', label: '입고', icon: ShoppingCart },
   { href: '/vendors', label: '거래처', icon: Users },
+  { href: '/approvals', label: '전자결재', icon: FileText },
+  { href: '/resources', label: '인력관리', icon: UserCog },
+  { href: '/timesheets', label: '근태관리', icon: Clock },
   { href: '/notifications', label: '알림', icon: Bell },
 ]
 

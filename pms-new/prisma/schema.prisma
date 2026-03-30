@@ -30,6 +30,8 @@ model User {
   timeSheets         TimeSheet[]
   managedSales       Sales[]         @relation("SalesManager")
   tasks              Task[]
+  submissions        Approval[]      @relation("ApprovalSubmitter")
+  approvalReviews    ApprovalApprover[]
 }
 
 model Customer {
@@ -91,6 +93,7 @@ model Project {
   cashFlows          CashFlow[]
   monthlySnapshots   MonthlyCostSnapshot[]
   dashboard          ProjectDashboard?
+  approvals          Approval[]
 }
 
 model ProjectMember {
@@ -402,6 +405,7 @@ model CostCategory {
   estimateItems  CostEstimateItem[]
   executionItems CostExecutionItem[]
   actualItems    CostActualItem[]
+  approvalItems  ApprovalLineItem[]
 }
 
 model CostEstimate {
@@ -626,6 +630,7 @@ model Vendor {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   orders         PurchaseOrder[]
+  approvals      Approval[]
 }
 
 model PurchaseOrder {
@@ -778,4 +783,59 @@ model ProjectDashboard {
   project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+// 전자 결재 시스템
+model Approval {
+  id            String   @id @default(cuid())
+  title         String
+  type          String   // INTERNAL_COST, EXTERNAL_PAYMENT, CUSTOMER_CLAIM
+  content       String?
+  amount        Float    @default(0)
+  status        String   @default("DRAFT") // DRAFT, SUBMITTED, REVIEWING, APPROVED, REJECTED
+  submitterId   String
+  projectId     String?
+  vendorId      String?
+  submitter     User     @relation("ApprovalSubmitter", fields: [submitterId], references: [id])
+  project       Project? @relation(fields: [projectId], references: [id])
+  vendor        Vendor?  @relation(fields: [vendorId], references: [id])
+  approvers     ApprovalApprover[]
+  lineItems     ApprovalLineItem[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  submittedAt   DateTime?
+  approvedAt    DateTime?
+
+  @@index([submitterId])
+  @@index([projectId])
+  @@index([status])
+}
+
+model ApprovalApprover {
+  id          String   @id @default(cuid())
+  approvalId  String
+  userId      String
+  order       Int      @default(0)
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  comments    String?
+  approvedAt  DateTime?
+  approval    Approval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([approvalId])
+  @@index([userId])
+}
+
+model ApprovalLineItem {
+  id                  String   @id @default(cuid())
+  approvalId          String
+  description         String
+  quantity            Float    @default(1)
+  unitPrice           Float    @default(0)
+  totalPrice          Float    @default(0)
+  costCategoryId      String?
+  costCategory        CostCategory? @relation(fields: [costCategoryId], references: [id])
+  approval            Approval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@index([approvalId])
 }
