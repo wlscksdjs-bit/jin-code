@@ -274,4 +274,48 @@ export const scheduleApi = {
   },
 };
 
+export const excelApi = {
+  importProjects: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await api.post('/projects/import/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  exportProjects: async () => {
+    const res = await api.get('/projects/export/', { responseType: 'blob' });
+    return res.data;
+  },
+
+  importResources: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await api.post('/resources/import/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  exportResources: async () => {
+    const res = await api.get('/resources/export/', { responseType: 'blob' });
+    return res.data;
+  },
+
+  importApprovals: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await api.post('/approvals/import/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  exportApprovals: async () => {
+    const res = await api.get('/approvals/export/', { responseType: 'blob' });
+    return res.data;
+  },
+};
+
 export default api;
