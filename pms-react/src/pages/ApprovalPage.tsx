@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { approvalApi, projectApi } from '../services/api';
+import { approvalApi, projectApi, excelApi } from '../services/api';
+import { createProjectTemplate, downloadExcel } from '../services/excel';
 import type { Approval, ApprovalType, Project } from '../types';
 
 export const ApprovalPage: React.FC = () => {
@@ -15,6 +16,9 @@ export const ApprovalPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'my' | 'pending' | 'create'>('my');
   const [showModal, setShowModal] = useState(false);
   const [selectedApproval, setSelectedApproval] = useState<Approval | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -85,6 +89,56 @@ export const ApprovalPage: React.FC = () => {
     return new Intl.NumberFormat('ko-KR').format(Number(value)) + '원';
   };
 
+  const handleDownloadTemplate = () => {
+    try {
+      const buffer = createProjectTemplate();
+      downloadExcel(buffer, '결재_양식.xlsx');
+    } catch (error) {
+      console.error('Failed to download template:', error);
+      alert('양식 다운로드에 실패했습니다.');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      await excelApi.importApprovals(file);
+      alert('결재 데이터를 성공적으로 가져왔습니다.');
+      loadData();
+    } catch (error) {
+      console.error('Failed to import approvals:', error);
+      alert('가져오기에 실패했습니다.');
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const blob = await excelApi.exportApprovals();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '결재_목록.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export approvals:', error);
+      alert('내보내기에 실패했습니다.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading) return <div className="p-8 text-center">로딩 중...</div>;
 
   return (
@@ -95,9 +149,38 @@ export const ApprovalPage: React.FC = () => {
             <button onClick={() => navigate('/dashboard')} className="text-gray-500 hover:text-gray-700">← 목록</button>
             <h1 className="text-xl font-bold text-gray-800">전자 결재</h1>
           </div>
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-            + 새 결재
-          </button>
+          <div className="flex gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".xlsx,.xls"
+              className="hidden"
+            />
+            <button
+              onClick={handleDownloadTemplate}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            >
+              양식 다운로드
+            </button>
+            <button
+              onClick={handleImportClick}
+              disabled={isImporting}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              {isImporting ? '가져오는 중...' : '가져오기'}
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={isExporting}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              {isExporting ? '내보내는 중...' : '내보내기'}
+            </button>
+            <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+              + 새 결재
+            </button>
+          </div>
         </div>
       </header>
 

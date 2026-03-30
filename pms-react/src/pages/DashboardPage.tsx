@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { projectApi } from '../services/api';
+import { projectApi, excelApi } from '../services/api';
+import { createProjectTemplate, downloadExcel } from '../services/excel';
 import type { Project } from '../types';
 
 export const DashboardPage: React.FC = () => {
@@ -14,6 +15,9 @@ export const DashboardPage: React.FC = () => {
   const [deleteStep, setDeleteStep] = useState(0);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<{
     name: string;
     client: string;
@@ -100,6 +104,56 @@ export const DashboardPage: React.FC = () => {
     setDeleteConfirmText('');
   };
 
+  const handleDownloadTemplate = () => {
+    try {
+      const buffer = createProjectTemplate();
+      downloadExcel(buffer, '프로젝트_양식.xlsx');
+    } catch (error) {
+      console.error('Failed to download template:', error);
+      alert('양식 다운로드에 실패했습니다.');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      await excelApi.importProjects(file);
+      alert('프로젝트를 성공적으로 가져왔습니다.');
+      loadProjects();
+    } catch (error) {
+      console.error('Failed to import projects:', error);
+      alert('가져오기에 실패했습니다.');
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const blob = await excelApi.exportProjects();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '프로젝트_목록.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export projects:', error);
+      alert('내보내기에 실패했습니다.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { bg: string; text: string }> = {
       waiting: { bg: 'bg-gray-100', text: 'text-gray-800' },
@@ -134,12 +188,41 @@ export const DashboardPage: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold text-gray-800">프로젝트 목록</h2>
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            + 새 프로젝트
-          </button>
+          <div className="flex gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".xlsx,.xls"
+              className="hidden"
+            />
+            <button
+              onClick={handleDownloadTemplate}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            >
+              양식 다운로드
+            </button>
+            <button
+              onClick={handleImportClick}
+              disabled={isImporting}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              {isImporting ? '가져오는 중...' : '가져오기'}
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={isExporting}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              {isExporting ? '내보내는 중...' : '내보내기'}
+            </button>
+            <button
+              onClick={() => setShowModal(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              + 새 프로젝트
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
