@@ -249,105 +249,95 @@ class BudgetViewSet(viewsets.ModelViewSet):
             )
             if created:
                 created_projects.append(project_name)
+            
+            # 다단 헤더 파싱: 계정명별로 항목 그룹화
+            current_account = None
+            account_items = {}
+            
+            for row in ws.iter_rows(min_row=1, values_only=True):
+                if not row:
+                    continue
                 
-                # 다단 헤더 파싱: 계정명별로 항목 그룹화
-                current_account = None
-                account_items = {}  # {계정명: [{item, vendor, amount}, ...]}
+                item_name = row[1] if len(row) > 1 else None
+                vendor_name = row[2] if len(row) > 2 else None
+                account_name = row[3] if len(row) > 3 else None
+                initial_cost = row[4] if len(row) > 4 else None
+                nego_cost = row[5] if len(row) > 5 else None
                 
-                # 첫 번째 행부터 시작 (헤더 행 스킵)
-                for row in ws.iter_rows(min_row=1, values_only=True):
-                    if not row:
-                        continue
-                    
-                    # 열 인덱스: B=1, C=2, D=3, E=4, F=5
-                    item_name = row[1] if len(row) > 1 else None  # 항목
-                    vendor_name = row[2] if len(row) > 2 else None  # 업체명
-                    account_name = row[3] if len(row) > 3 else None  # 계정명
-                    initial_cost = row[4] if len(row) > 4 else None  # 최초 실행원가
-                    nego_cost = row[5] if len(row) > 5 else None  # 네고 반영가
-                    
-                    # 헤더 행 스킵
-                    if not item_name or item_name in ['항목', '구분', None]:
-                        continue
-                    
-                    # 계정명 변경 감지
-                    if account_name and account_name != current_account:
-                        current_account = account_name
-                        if current_account not in account_items:
-                            account_items[current_account] = []
-                    
-                    # 금액 계산 (네고 반영가 우선, 없으면 최초 실행원가)
-                    amount = 0
-                    if isinstance(nego_cost, (int, float)):
-                        amount = nego_cost
-                    elif isinstance(initial_cost, (int, float)):
-                        amount = initial_cost
-                    
-                    if amount > 0 and current_account:
-                        account_items[current_account].append({
-                            'item': item_name,
-                            'vendor': vendor_name,
-                            'amount': amount,
-                        })
+                if not item_name or item_name in ['항목', '구분', None]:
+                    continue
                 
-                # 계정명별로 예산(Budget) 생성
-                for account_name, items in account_items.items():
-                    total_amount = sum(item['amount'] for item in items)
+                if account_name and account_name != current_account:
+                    current_account = account_name
+                    if current_account not in account_items:
+                        account_items[current_account] = []
+                
+                amount = 0
+                if isinstance(nego_cost, (int, float)):
+                    amount = nego_cost
+                elif isinstance(initial_cost, (int, float)):
+                    amount = initial_cost
+                
+                if amount > 0 and current_account:
+                    account_items[current_account].append({
+                        'item': item_name,
+                        'vendor': vendor_name,
+                        'amount': amount,
+                    })
+            
+            for account_name, items in account_items.items():
+                total_amount = sum(item['amount'] for item in items)
+                
+                category_type = self._guess_category_type(account_name)
+                category, _ = CostCategory.objects.get_or_create(
+                    name=account_name,
+                    defaults={
+                        'category_type': category_type,
+                        'description': f'Auto imported from {project_name}',
+                    }
+                )
+                
+                budget, budget_created = Budget.objects.update_or_create(
+                    project=project,
+                    category=category,
+                    defaults={
+                        'planned_amount': total_amount,
+                        'description': f'{project_name} - {account_name}',
+                        'created_by': request.user,
+                    }
+                )
+                
+                if budget_created:
+                    created_budgets.append({
+                        'project': project_name,
+                        'category': account_name,
+                        'amount': total_amount,
+                    })
+                
+                for item in items:
+                    if item['vendor']:
+                        vendor, _ = Vendor.objects.get_or_create(
+                            name=item['vendor'],
+                            defaults={'is_active': True}
+                        )
+                    else:
+                        vendor = None
                     
-                    # CostCategory 생성 또는 조회
-                    category_type = self._guess_category_type(account_name)
-                    category, _ = CostCategory.objects.get_or_create(
-                        name=account_name,
-                        defaults={
-                            'category_type': category_type,
-                            'description': f'Auto imported from {sheet_name}',
-                        }
-                    )
+                    existing_expense = Expense.objects.filter(
+                        budget=budget,
+                        description__contains=item['item'],
+                    ).first()
                     
-                    # Budget 생성 또는 업데이트
-                    budget, budget_created = Budget.objects.update_or_create(
-                        project=project,
-                        category=category,
-                        defaults={
-                            'planned_amount': total_amount,
-                            'description': f'{sheet_name} - {account_name}',
-                            'created_by': request.user,
-                        }
-                    )
-                    
-                    if budget_created:
-                        created_budgets.append({
-                            'project': project_name,
-                            'category': account_name,
-                            'amount': total_amount,
-                        })
-                    
-                    # 상세 항목은 Expense로 저장 (상세 분할 관리용)
-                    for item in items:
-                        if item['vendor']:
-                            vendor, _ = Vendor.objects.get_or_create(
-                                name=item['vendor'],
-                                defaults={'is_active': True}
-                            )
-                        else:
-                            vendor = None
-                        
-                        # 이미 Expense가 있는지 확인 (중복 방지)
-                        existing_expense = Expense.objects.filter(
+                    if not existing_expense and item['amount'] > 0:
+                        Expense.objects.create(
                             budget=budget,
-                            description__contains=item['item'],
-                        ).first()
-                        
-                        if not existing_expense and item['amount'] > 0:
-                            Expense.objects.create(
-                                budget=budget,
-                                vendor=vendor,
-                                amount=item['amount'],
-                                description=f"{item['item']} - {item['vendor'] or ''}",
-                                expense_date=datetime.now().date(),
-                                status='pending',
-                                submitted_by=request.user,
-                            )
+                            vendor=vendor,
+                            amount=item['amount'],
+                            description=f"{item['item']} - {item['vendor'] or ''}",
+                            expense_date=datetime.now().date(),
+                            status='pending',
+                            submitted_by=request.user,
+                        )
             
             return Response({
                 'message': f'{len(created_projects)}개 프로젝트, {len(created_budgets)}개 예산 생성됨',
