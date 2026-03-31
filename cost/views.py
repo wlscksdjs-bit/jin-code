@@ -354,7 +354,6 @@ class BudgetViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
     
     def _guess_category_type(self, account_name):
-        """계정명으로 카테고리 타입 추측"""
         if not account_name:
             return 'etc'
         
