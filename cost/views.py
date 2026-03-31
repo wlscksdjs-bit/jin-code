@@ -228,28 +228,27 @@ class BudgetViewSet(viewsets.ModelViewSet):
             created_budgets = []
             errors = []
             
-            # 시트별로 처리 (예: 대기, 수처리, BHI, 도레이, KTC 등)
-            for sheet_name in wb.sheetnames:
-                # 실행예산서 시트는 건너뛰기 (집계 시트)
-                if '실행예산서' in sheet_name or '제안서' in sheet_name:
-                    continue
-                    
-                ws = wb[sheet_name]
-                
-                # 시트 이름으로 프로젝트 생성 또는 조회
-                project_name = sheet_name
-                project, created = Project.objects.get_or_create(
-                    name=project_name,
-                    defaults={
-                        'client': '',
-                        'status': 'planning',
-                        'start_date': datetime.now().date(),
-                        'end_date': datetime.now().date(),
-                        'created_by': request.user,
-                    }
-                )
-                if created:
-                    created_projects.append(project_name)
+            # 실행예산서 시트만 처리 (집계 시트)
+            target_sheet = '실행예산서 (2)'
+            if target_sheet not in wb.sheetnames:
+                return Response({'error': f'시트 "{target_sheet}"를 찾을 수 없습니다.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            ws = wb[target_sheet]
+            
+            # 프로젝트명: 시트 이름 또는 사용자가 지정
+            project_name = request.data.get('project_name', target_sheet)
+            project, created = Project.objects.get_or_create(
+                name=project_name,
+                defaults={
+                    'client': '',
+                    'status': 'planning',
+                    'start_date': datetime.now().date(),
+                    'end_date': datetime.now().date(),
+                    'created_by': request.user,
+                }
+            )
+            if created:
+                created_projects.append(project_name)
                 
                 # 다단 헤더 파싱: 계정명별로 항목 그룹화
                 current_account = None
