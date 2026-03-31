@@ -525,6 +525,232 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {showSimulator && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">목표 이익률 시뮬레이터</h3>
+              <button onClick={() => setShowSimulator(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">예상 원가 (원)</label>
+                <input
+                  type="number"
+                  value={simulatorData.estimated_cost}
+                  onChange={(e) => setSimulatorData({ ...simulatorData, estimated_cost: e.target.value })}
+                  placeholder="예: 10000000"
+                  className="w-full px-3 py-2 border rounded-md focus:ring-purple-500 focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">목표 이익률 (%)</label>
+                <input
+                  type="number"
+                  value={simulatorData.target_profit_rate}
+                  onChange={(e) => setSimulatorData({ ...simulatorData, target_profit_rate: e.target.value })}
+                  placeholder="예: 10"
+                  className="w-full px-3 py-2 border rounded-md focus:ring-purple-500 focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">간접비율 (%)</label>
+                <input
+                  type="number"
+                  value={simulatorData.indirect_rate}
+                  onChange={(e) => setSimulatorData({ ...simulatorData, indirect_rate: e.target.value })}
+                  placeholder="예: 15"
+                  className="w-full px-3 py-2 border rounded-md focus:ring-purple-500 focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">운영비율 (%)</label>
+                <input
+                  type="number"
+                  value={simulatorData.operating_expense_rate}
+                  onChange={(e) => setSimulatorData({ ...simulatorData, operating_expense_rate: e.target.value })}
+                  placeholder="예: 10"
+                  className="w-full px-3 py-2 border rounded-md focus:ring-purple-500 focus:border-purple-500"
+                />
+              </div>
+            </div>
+            
+            <button
+              onClick={runSimulator}
+              className="w-full px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 mb-6"
+            >
+              계산하기
+            </button>
+            
+            {simulatorResult && (
+              <div className="bg-purple-50 rounded-lg p-4">
+                <h4 className="font-semibold text-purple-900 mb-3">계산 결과</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">예상 원가:</span>
+                    <span className="font-medium">{Number(simulatorData.estimated_cost || 0).toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">간접비:</span>
+                    <span className="font-medium">{simulatorResult.indirect_cost.toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">운영비:</span>
+                    <span className="font-medium">{simulatorResult.operating_expense.toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-gray-600">총 비용:</span>
+                    <span className="font-medium">{(Number(simulatorData.estimated_cost) + simulatorResult.indirect_cost + simulatorResult.operating_expense).toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between bg-purple-100 p-2 rounded mt-2">
+                    <span className="font-semibold text-purple-900">입찰 예상가:</span>
+                    <span className="font-bold text-purple-700">{simulatorResult.target_bid.toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">예상 이익:</span>
+                    <span className={`font-medium ${simulatorResult.expected_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {simulatorResult.expected_profit.toLocaleString()}원
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">실제 이익률:</span>
+                    <span className={`font-medium ${simulatorResult.actual_profit_rate >= Number(simulatorData.target_profit_rate) ? 'text-green-600' : 'text-red-600'}`}>
+                      {simulatorResult.actual_profit_rate.toFixed(2)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowSimulator(false)}
+                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showVersionCompare && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">프로젝트 버전 비교</h3>
+              <button onClick={() => setShowVersionCompare(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-sm text-gray-600 mb-4">
+                비교할 버전을 선택하세요. 두 버전의 차이점을 확인합니다.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">버전 1</label>
+                  <select
+                    value={compareVersions.v1}
+                    onChange={(e) => setCompareVersions({ ...compareVersions, v1: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">버전 선택</option>
+                    <option value="v1">버전 1 (2025-01-01)</option>
+                    <option value="v2">버전 2 (2025-02-01)</option>
+                    <option value="v3">버전 3 (2025-03-01)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">버전 2</label>
+                  <select
+                    value={compareVersions.v2}
+                    onChange={(e) => setCompareVersions({ ...compareVersions, v2: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">버전 선택</option>
+                    <option value="v1">버전 1 (2025-01-01)</option>
+                    <option value="v2">버전 2 (2025-02-01)</option>
+                    <option value="v3">버전 3 (2025-03-01)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            {compareVersions.v1 && compareVersions.v2 && (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">항목</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">버전 1</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">버전 2</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">변경</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium">예상 원가</td>
+                      <td className="px-4 py-3 text-sm text-right">10,000,000원</td>
+                      <td className="px-4 py-3 text-sm text-right">12,000,000원</td>
+                      <td className="px-4 py-3 text-sm text-right text-red-600">+2,000,000 (+20%)</td>
+                    </tr>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium">목표 이익률</td>
+                      <td className="px-4 py-3 text-sm text-right">10%</td>
+                      <td className="px-4 py-3 text-sm text-right">12%</td>
+                      <td className="px-4 py-3 text-sm text-right text-green-600">+2%</td>
+                    </tr>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium">입찰 예상가</td>
+                      <td className="px-4 py-3 text-sm text-right">13,500,000원</td>
+                      <td className="px-4 py-3 text-sm text-right">15,800,000원</td>
+                      <td className="px-4 py-3 text-sm text-right text-red-600">+2,300,000</td>
+                    </tr>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium">기간</td>
+                      <td className="px-4 py-3 text-sm text-right">3개월</td>
+                      <td className="px-4 py-3 text-sm text-right">4개월</td>
+                      <td className="px-4 py-3 text-sm text-right text-yellow-600">+1개월</td>
+                    </tr>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium">인력 요구</td>
+                      <td className="px-4 py-3 text-sm text-right">5명</td>
+                      <td className="px-4 py-3 text-sm text-right">6명</td>
+                      <td className="px-4 py-3 text-sm text-right text-yellow-600">+1명</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            {(!compareVersions.v1 || !compareVersions.v2) && (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                버전을 모두 선택하면 비교 결과가 표시됩니다.
+              </div>
+            )}
+            
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowVersionCompare(false)}
+                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
