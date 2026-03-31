@@ -222,7 +222,7 @@ class BudgetViewSet(viewsets.ModelViewSet):
             return Response({'error': '파일이 없습니다.'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            wb = Workbook(BytesIO(file.read()))
+            wb = Workbook(BytesIO(file.read()), data_only=True)
             
             created_projects = []
             created_budgets = []
