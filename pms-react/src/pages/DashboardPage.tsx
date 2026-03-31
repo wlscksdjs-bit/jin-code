@@ -5,12 +5,32 @@ import { projectApi, excelApi } from '../services/api';
 import { createProjectTemplate, downloadExcel } from '../services/excel';
 import type { Project } from '../types';
 
+// 파이프라인 단계 정의
+const PIPELINE_STAGES = [
+  { id: 'target', name: '타겟 발굴', color: 'bg-gray-100' },
+  { id: 'proposal', name: '제안 준비', color: 'bg-blue-100' },
+  { id: 'bidding', name: '입찰', color: 'bg-yellow-100' },
+  { id: 'won', name: '수주', color: 'bg-green-100' },
+  { id: 'lost', name: '실패', color: 'bg-red-100' },
+];
+
+// 프로젝트 타입 확장 (파이프라인용)
+interface PipelineProject extends Project {
+  pipeline_stage?: string;
+  target_amount?: string;
+  estimated_cost?: string;
+  target_profit_rate?: string;
+}
+
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<PipelineProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [showSimulator, setShowSimulator] = useState(false);
+  const [showVersionCompare, setShowVersionCompare] = useState(false);
   const [deleteProject, setDeleteProject] = useState<Project | null>(null);
   const [deleteStep, setDeleteStep] = useState(0);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -18,6 +38,26 @@ export const DashboardPage: React.FC = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [draggedProject, setDraggedProject] = useState<PipelineProject | null>(null);
+
+  // 목표 이익률 시뮬레이터 상태
+  const [simulatorData, setSimulatorData] = useState({
+    estimated_cost: '',
+    target_profit_rate: '10',
+    indirect_rate: '15',
+    operating_expense_rate: '10',
+  });
+  const [simulatorResult, setSimulatorResult] = useState<{
+    target_bid: number;
+    indirect_cost: number;
+    operating_expense: number;
+    expected_profit: number;
+    actual_profit_rate: number;
+  } | null>(null);
+
+  // 버전 비교 상태
+  const [compareVersions, setCompareVersions] = useState<{ v1: string; v2: string }>({ v1: '', v2: '' });
+
   const [formData, setFormData] = useState<{
     name: string;
     client: string;
@@ -154,6 +194,47 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  const runSimulator = () => {
+    const estimated = Number(simulatorData.estimated_cost) || 0;
+    const profitRate = Number(simulatorData.target_profit_rate) || 0;
+    const indirectRate = Number(simulatorData.indirect_rate) || 0;
+    const operatingRate = Number(simulatorData.operating_expense_rate) || 0;
+
+    const indirectCost = Math.round(estimated * (indirectRate / 100));
+    const operatingExpense = Math.round(estimated * (operatingRate / 100));
+    const totalCost = estimated + indirectCost + operatingExpense;
+    const targetBid = Math.round(totalCost / (1 - profitRate / 100));
+    const expectedProfit = targetBid - totalCost;
+    const actualProfitRate = (expectedProfit / targetBid) * 100;
+
+    setSimulatorResult({
+      target_bid: targetBid,
+      indirect_cost: indirectCost,
+      operating_expense: operatingExpense,
+      expected_profit: expectedProfit,
+      actual_profit_rate: actualProfitRate,
+    });
+  };
+
+  const handleDragStart = (project: PipelineProject) => {
+    setDraggedProject(project);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (stageId: string) => {
+    if (!draggedProject) return;
+    try {
+      await projectApi.updateProject(draggedProject.id, { status: stageId as any });
+      loadProjects();
+    } catch (error) {
+      console.error('Failed to update stage:', error);
+    }
+    setDraggedProject(null);
+  };
+
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { bg: string; text: string }> = {
       waiting: { bg: 'bg-gray-100', text: 'text-gray-800' },
@@ -187,7 +268,25 @@ export const DashboardPage: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-semibold text-gray-800">프로젝트 목록</h2>
+          <div className="flex gap-4 items-center">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {viewMode === 'kanban' ? '수주 파이프라인' : '프로젝트 목록'}
+            </h2>
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 text-sm rounded ${viewMode === 'list' ? 'bg-white shadow' : 'text-gray-600'}`}
+              >
+                목록
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`px-3 py-1 text-sm rounded ${viewMode === 'kanban' ? 'bg-white shadow' : 'text-gray-600'}`}
+              >
+                칸반
+              </button>
+            </div>
+          </div>
           <div className="flex gap-2">
             <input
               type="file"
@@ -217,6 +316,18 @@ export const DashboardPage: React.FC = () => {
               {isExporting ? '내보내는 중...' : '내보내기'}
             </button>
             <button
+              onClick={() => setShowSimulator(true)}
+              className="px-4 py-2 border border-purple-300 text-purple-700 rounded-md hover:bg-purple-50"
+            >
+              목표 이익률 시뮬레이터
+            </button>
+            <button
+              onClick={() => setShowVersionCompare(true)}
+              className="px-4 py-2 border border-orange-300 text-orange-700 rounded-md hover:bg-orange-50"
+            >
+              버전 비교
+            </button>
+            <button
               onClick={() => setShowModal(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
@@ -225,7 +336,42 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {isLoading ? (
+        {viewMode === 'kanban' ? (
+          <div className="grid grid-cols-5 gap-4 overflow-x-auto pb-4">
+            {PIPELINE_STAGES.map((stage) => {
+              const stageProjects = projects.filter(p => (p as any).status === stage.id);
+              return (
+                <div
+                  key={stage.id}
+                  className={`${stage.color} rounded-lg p-3 min-h-[400px]`}
+                  onDragOver={handleDragOver}
+                  onDrop={() => handleDrop(stage.id)}
+                >
+                  <h3 className="font-semibold text-gray-800 mb-3 text-center">{stage.name} ({stageProjects.length})</h3>
+                  <div className="space-y-2">
+                    {stageProjects.map((project) => (
+                      <div
+                        key={project.id}
+                        draggable
+                        onDragStart={() => handleDragStart(project)}
+                        className="bg-white rounded-lg shadow p-3 cursor-move hover:shadow-md transition-shadow"
+                        onClick={() => navigate(`/projects/${project.id}`)}
+                      >
+                        <div className="font-medium text-sm text-gray-900">{project.name}</div>
+                        <div className="text-xs text-gray-500 mt-1">{project.client}</div>
+                        {project.target_amount && (
+                          <div className="text-xs text-blue-600 mt-1">
+                            목표: {Number(project.target_amount).toLocaleString()}원
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : isLoading ? (
           <div className="text-center py-8 text-gray-500">로딩 중...</div>
         ) : projects.length === 0 ? (
           <div className="text-center py-8 text-gray-500">프로젝트가 없습니다.</div>
