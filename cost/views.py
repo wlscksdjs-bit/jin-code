@@ -206,7 +206,13 @@ class BudgetViewSet(viewsets.ModelViewSet):
         return response
 
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser])
-    def import_excel(self, request):
+    def import_execution_budget(self, request):
+        """
+        다단 헤더 실행예산서 Excel 파싱
+        - 시트별로 프로젝트 생성
+        - 계정명(큰 항목)별로 예산 합산
+        - 상세 항목은 Expense로 관리
+        """
         from projects.models import Project
         from django.contrib.auth import get_user_model
         User = get_user_model()
@@ -217,40 +223,166 @@ class BudgetViewSet(viewsets.ModelViewSet):
         
         try:
             wb = Workbook(BytesIO(file.read()))
-            ws = wb.active
             
             created_projects = []
+            created_budgets = []
             errors = []
             
-            for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
-                if not row[0]:
+            # 시트별로 처리 (예: 대기, 수처리, BHI, 도레이, KTC 등)
+            for sheet_name in wb.sheetnames:
+                # 실행예산서 시트는 건너뛰기 (집계 시트)
+                if '실행예산서' in sheet_name or '제안서' in sheet_name:
                     continue
+                    
+                ws = wb[sheet_name]
                 
-                project_name = row[0]
-                client = row[1] or ''
-                status_val = row[2] or 'waiting'
-                
+                # 시트 이름으로 프로젝트 생성 또는 조회
+                project_name = sheet_name
                 project, created = Project.objects.get_or_create(
                     name=project_name,
                     defaults={
-                        'client': client,
-                        'status': status_val if status_val in ['waiting', 'planning', 'in_progress', 'completed', 'cancelled'] else 'waiting',
+                        'client': '',
+                        'status': 'planning',
+                        'start_date': datetime.now().date(),
+                        'end_date': datetime.now().date(),
                         'created_by': request.user,
                     }
                 )
-                
                 if created:
                     created_projects.append(project_name)
-                else:
-                    errors.append(f'{row_num}행: "{project_name}" 프로젝트가 이미 존재합니다.')
+                
+                # 다단 헤더 파싱: 계정명별로 항목 그룹화
+                current_account = None
+                account_items = {}  # {계정명: [{item, vendor, amount}, ...]}
+                
+                # 첫 번째 행부터 시작 (헤더 행 스킵)
+                for row in ws.iter_rows(min_row=1, values_only=True):
+                    if not row:
+                        continue
+                    
+                    # 열 인덱스: B=1, C=2, D=3, E=4, F=5
+                    item_name = row[1] if len(row) > 1 else None  # 항목
+                    vendor_name = row[2] if len(row) > 2 else None  # 업체명
+                    account_name = row[3] if len(row) > 3 else None  # 계정명
+                    initial_cost = row[4] if len(row) > 4 else None  # 최초 실행원가
+                    nego_cost = row[5] if len(row) > 5 else None  # 네고 반영가
+                    
+                    # 헤더 행 스킵
+                    if not item_name or item_name in ['항목', '구분', None]:
+                        continue
+                    
+                    # 계정명 변경 감지
+                    if account_name and account_name != current_account:
+                        current_account = account_name
+                        if current_account not in account_items:
+                            account_items[current_account] = []
+                    
+                    # 금액 계산 (네고 반영가 우선, 없으면 최초 실행원가)
+                    amount = 0
+                    if isinstance(nego_cost, (int, float)):
+                        amount = nego_cost
+                    elif isinstance(initial_cost, (int, float)):
+                        amount = initial_cost
+                    
+                    if amount > 0 and current_account:
+                        account_items[current_account].append({
+                            'item': item_name,
+                            'vendor': vendor_name,
+                            'amount': amount,
+                        })
+                
+                # 계정명별로 예산(Budget) 생성
+                for account_name, items in account_items.items():
+                    total_amount = sum(item['amount'] for item in items)
+                    
+                    # CostCategory 생성 또는 조회
+                    category_type = self._guess_category_type(account_name)
+                    category, _ = CostCategory.objects.get_or_create(
+                        name=account_name,
+                        defaults={
+                            'category_type': category_type,
+                            'description': f'Auto imported from {sheet_name}',
+                        }
+                    )
+                    
+                    # Budget 생성 또는 업데이트
+                    budget, budget_created = Budget.objects.update_or_create(
+                        project=project,
+                        category=category,
+                        defaults={
+                            'planned_amount': total_amount,
+                            'description': f'{sheet_name} - {account_name}',
+                            'created_by': request.user,
+                        }
+                    )
+                    
+                    if budget_created:
+                        created_budgets.append({
+                            'project': project_name,
+                            'category': account_name,
+                            'amount': total_amount,
+                        })
+                    
+                    # 상세 항목은 Expense로 저장 (상세 분할 관리용)
+                    for item in items:
+                        if item['vendor']:
+                            vendor, _ = Vendor.objects.get_or_create(
+                                name=item['vendor'],
+                                defaults={'is_active': True}
+                            )
+                        else:
+                            vendor = None
+                        
+                        # 이미 Expense가 있는지 확인 (중복 방지)
+                        existing_expense = Expense.objects.filter(
+                            budget=budget,
+                            description__contains=item['item'],
+                        ).first()
+                        
+                        if not existing_expense and item['amount'] > 0:
+                            Expense.objects.create(
+                                budget=budget,
+                                vendor=vendor,
+                                amount=item['amount'],
+                                description=f"{item['item']} - {item['vendor'] or ''}",
+                                expense_date=datetime.now().date(),
+                                status='pending',
+                                submitted_by=request.user,
+                            )
             
             return Response({
-                'message': f'{len(created_projects)}개 프로젝트 생성됨',
-                'created': created_projects,
+                'message': f'{len(created_projects)}개 프로젝트, {len(created_budgets)}개 예산 생성됨',
+                'projects': created_projects,
+                'budgets': created_budgets,
                 'errors': errors
             })
+            
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            import traceback
+            return Response({
+                'error': str(e),
+                'trace': traceback.format_exc()
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
+    def _guess_category_type(self, account_name):
+        """계정명으로 카테고리 타입 추측"""
+        if not account_name:
+            return 'etc'
+        
+        account_lower = account_name.lower()
+        
+        if '외주' in account_name:
+            return 'outsource'
+        elif '자재' in account_name or '재료' in account_name:
+            return 'material'
+        elif '인건' in account_name or '근거' in account_name:
+            return 'labor'
+        elif '장비' in account_name or '장치' in account_name:
+            return 'equipment'
+        else:
+            return 'etc'
+
+    @action(detail=False, methods=['get'])
 
     @action(detail=True, methods=['get'])
     def monthly_report(self, request, pk=None):
